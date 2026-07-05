@@ -1,15 +1,16 @@
 # Build stage
-FROM node:20-alpine AS build
+FROM node:22-bookworm AS build
 
 WORKDIR /app
 
-# Install pnpm globally
-RUN npm install -g pnpm
+# Install build dependencies for better-sqlite3 (Debian has pre-built toolchains readily available)
+RUN apt-get update && apt-get install -y python3 make g++ gcc libc6-dev && \
+    npm install -g pnpm
 
 # Copy package.json and pnpm-lock.yaml (if present) to install dependencies
 COPY package.json pnpm-lock.yaml* ./
 
-# Install dependencies (only production if needed, or build everything)
+# Install dependencies
 RUN pnpm install --frozen-lockfile
 
 # Copy local source code and configurations
@@ -23,7 +24,7 @@ RUN pnpm build
 RUN rm -rf node_modules && pnpm install --prod --frozen-lockfile
 
 # Production stage
-FROM node:20-alpine
+FROM node:22-bookworm-slim
 
 WORKDIR /app
 
