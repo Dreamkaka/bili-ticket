@@ -1,0 +1,31 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: ticket-probe
+  namespace: ticket-monitor
+spec:
+  selector:
+    matchLabels:
+      app: ticket-probe
+  template:
+    metadata:
+      labels:
+        app: ticket-probe
+    spec:
+      containers:
+        - name: probe
+          image: <your-registry>/ticket-probe:latest
+          env:
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: GATEWAY_WS_URL
+              value: "ws://gateway.ticket-monitor.svc.cluster.local:3000/ws/probe"
+          resources:
+            requests:
+              cpu: "10m"
+              memory: "16Mi"
+            limits:
+              cpu: "100m"
+              memory: "64Mi"

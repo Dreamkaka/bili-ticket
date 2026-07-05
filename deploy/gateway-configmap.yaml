@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gateway-config
+  namespace: ticket-monitor
+data:
+  config.json: |
+    {
+      "poll_interval_ms": 10000,
+      "core_ids": [
+        "1001701",
+        "1001653"
+      ],
+      "shard_ids": [
+        "1002403"
+      ]
+    }

@@ -1,0 +1,94 @@
+name: Build and Push Docker Images
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    tags:
+      - 'v*'
+  workflow_dispatch: # 支持手动触发
+
+env:
+  REGISTRY: ghcr.io
+  # GitHub 仓库名需要转为小写以作为镜像名，在 jobs 中动态处理
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 1. 登录到 GitHub Container Registry (GHCR)
+      # 也可以修改为 Docker Hub 登录，仅需替换用户名/密码为 Secret
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # 2. 设置 QEMU 模拟器（用于跨平台构建，例如同时构建 amd64 和 arm64 镜像）
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      # 3. 设置 Docker Buildx 构建器
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # 4. 生成 Gateway 镜像的 Metadata (Tags/Labels)
+      - name: Extract metadata for Gateway
+        id: meta-gateway
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ github.repository }}/ticket-gateway
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=sha,prefix=sha-
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' }}
+
+      # 5. 构建并推送 Gateway 镜像
+      - name: Build and push Gateway image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./gateway
+          file: ./gateway/Dockerfile
+          push: true
+          # 构建多架构镜像（同时兼容 AMD64/ARM64 芯片，如 M1/M2/M3 等）
+          platforms: linux/amd64,linux/arm64
+          tags: ${{ steps.meta-gateway.outputs.tags }}
+          labels: ${{ steps.meta-gateway.outputs.labels }}
+          # 缓存优化提升构建速度
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # 6. 生成 Probe 镜像的 Metadata (Tags/Labels)
+      - name: Extract metadata for Probe
+        id: meta-probe
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ github.repository }}/ticket-probe
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=sha,prefix=sha-
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' }}
+
+      # 7. 构建并推送 Probe 镜像
+      - name: Build and push Probe image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./probe
+          file: ./probe/Dockerfile
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: ${{ steps.meta-probe.outputs.tags }}
+          labels: ${{ steps.meta-probe.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

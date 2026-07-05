@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: ticket-probe
+  namespace: ticket-monitor
+  labels:
+    app: ticket-probe
+spec:
+  selector:
+    matchLabels:
+      app: ticket-probe
+  template:
+    metadata:
+      labels:
+        app: ticket-probe
+    spec:
+      # 如果需要防范调度问题，或者需要在特定节点运行，可以通过 nodeSelector 或 tolerations 设置
+      containers:
+        - name: probe
+          image: <your-registry>/ticket-probe:latest
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            # 指向 K8s 内部 ticket-gateway Service 的 DNS
+            - name: GATEWAY_WS_URL
+              value: "ws://ticket-gateway.ticket-monitor.svc.cluster.local:3000/ws/probe"
+            - name: PROBE_USER_AGENT
+              value: "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
+          resources:
+            requests:
+              cpu: "10m"
+              memory: "16Mi"
+            limits:
+              cpu: "100m"
+              memory: "64Mi"
