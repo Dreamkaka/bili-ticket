@@ -8,7 +8,7 @@ RUN apt-get update && apt-get install -y python3 make g++ gcc libc6-dev && \
     npm install -g pnpm
 
 # Copy package.json and pnpm-lock.yaml (if present) to install dependencies
-COPY package.json pnpm-lock.yaml* ./
+COPY package.json pnpm-lock.yaml* .npmrc* ./
 
 # Install dependencies
 RUN pnpm install --frozen-lockfile
