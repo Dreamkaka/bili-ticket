@@ -11,7 +11,7 @@ RUN apt-get update && apt-get install -y python3 make g++ gcc libc6-dev && \
 COPY package.json pnpm-lock.yaml* ./
 
 # Install dependencies
-RUN pnpm install --frozen-lockfile
+RUN pnpm config set only-built-dependencies-export-all true && pnpm install --frozen-lockfile
 
 # Copy local source code and configurations
 COPY tsconfig.json ./
