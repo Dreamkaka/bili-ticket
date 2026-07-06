@@ -4,24 +4,25 @@ FROM node:22-bookworm AS build
 WORKDIR /app
 
 # Install build dependencies for better-sqlite3 (Debian has pre-built toolchains readily available)
-RUN apt-get update && apt-get install -y python3 make g++ gcc libc6-dev && \
-    npm install -g pnpm
+RUN apt-get update && apt-get install -y python3 make g++ gcc libc6-dev
 
-# Copy package.json and pnpm-lock.yaml (if present) to install dependencies
-COPY package.json pnpm-lock.yaml* .npmrc* ./
+# Copy package.json to install dependencies
+COPY package.json ./
 
-# Install dependencies
-RUN pnpm install --frozen-lockfile
+# Install dependencies (using npm ci for reliable builds from package-lock.json)
+# If package-lock.json doesn't exist, npm will generate it. But since we copy package.json,
+# we can just use npm install to be safe.
+RUN npm install
 
 # Copy local source code and configurations
 COPY tsconfig.json ./
 COPY src/ ./src/
 
 # Build TypeScript to JavaScript
-RUN pnpm build
+RUN npm run build
 
 # Clean dev dependencies for production image footprint
-RUN rm -rf node_modules && pnpm install --prod --frozen-lockfile
+RUN rm -rf node_modules && npm prune --production
 
 # Production stage
 FROM node:22-bookworm-slim
