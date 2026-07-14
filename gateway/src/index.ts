@@ -1,11 +1,11 @@
 import { Elysia, t } from "elysia";
 import { node } from "@elysia/node";
-import Database from "better-sqlite3";
+import { DatabaseSync } from "node:sqlite";
 import * as fs from "fs";
 import * as path from "path";
 import { openapi } from "@elysia/openapi";
 
-// 初始化 SQLite 数据库
+// 初始化 SQLite 数据库（Node.js 内置 node:sqlite）
 const dbPath =
   process.env.DATABASE_PATH || path.join(process.cwd(), "gateway.db");
 // 确保数据库文件所在的目录存在
@@ -13,7 +13,27 @@ const dbDir = path.dirname(dbPath);
 if (!fs.existsSync(dbDir)) {
   fs.mkdirSync(dbDir, { recursive: true });
 }
-const db = new Database(dbPath);
+const db = new DatabaseSync(dbPath);
+
+function dbTransaction<TArgs extends any[], TResult>(
+  fn: (...args: TArgs) => TResult,
+): (...args: TArgs) => TResult {
+  return (...args: TArgs) => {
+    db.exec("BEGIN");
+    try {
+      const result = fn(...args);
+      db.exec("COMMIT");
+      return result;
+    } catch (err) {
+      try {
+        db.exec("ROLLBACK");
+      } catch {
+        // ignore rollback errors
+      }
+      throw err;
+    }
+  };
+}
 
 // 创建并更新数据库表结构
 db.exec(`
@@ -60,7 +80,9 @@ db.exec(`
 
 // 【自适应数据库热升级】自动检测旧数据库并补全字段
 try {
-  const tableInfo = db.pragma("table_info(projects)") as any[];
+  const tableInfo = db.prepare("PRAGMA table_info(projects)").all() as {
+    name: string;
+  }[];
   const columns = tableInfo.map((c) => c.name);
   if (!columns.includes("name")) {
     db.exec("ALTER TABLE projects ADD COLUMN name TEXT;");
@@ -217,7 +239,7 @@ async function syncProjectsFromConfig() {
         );
 
         const now = Date.now();
-        const insertTicketsTx = db.transaction((ticketsList: any[]) => {
+        const insertTicketsTx = dbTransaction((ticketsList: any[]) => {
           for (const tk of ticketsList) {
             upsertTicketFromMeta.run(
               task.id,
@@ -467,7 +489,7 @@ const app = new Elysia({ adapter: node() })
               last_updated = excluded.last_updated
           `);
 
-          const insertMany = db.transaction((diffs: any[]) => {
+          const insertMany = dbTransaction((diffs: any[]) => {
             for (const diff of diffs) {
               // 写入变动历史
               insertDiff.run(

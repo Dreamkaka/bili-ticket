@@ -1,17 +1,12 @@
 # Build stage
-FROM node:22-bookworm AS build
+FROM node:24.18.0-trixie AS build
 
 WORKDIR /app
-
-# Install build dependencies for better-sqlite3 (Debian has pre-built toolchains readily available)
-RUN apt-get update && apt-get install -y python3 make g++ gcc libc6-dev
 
 # Copy package.json to install dependencies
 COPY package.json ./
 
-# Install dependencies (using npm ci for reliable builds from package-lock.json)
-# If package-lock.json doesn't exist, npm will generate it. But since we copy package.json,
-# we can just use npm install to be safe.
+# Install dependencies (no native modules required after switching to node:sqlite)
 RUN npm install
 
 # Copy local source code and configurations
@@ -25,7 +20,7 @@ RUN npm run build
 RUN rm -rf node_modules && npm prune --production
 
 # Production stage
-FROM node:22-bookworm-slim
+FROM node:24.18.0-trixie
 
 WORKDIR /app
 
@@ -44,4 +39,5 @@ RUN mkdir -p /data /config
 
 EXPOSE 3000
 
-CMD ["node", "dist/index.js"]
+# node:sqlite is still experimental on Node 24
+CMD ["node", "--experimental-sqlite", "dist/index.js"]

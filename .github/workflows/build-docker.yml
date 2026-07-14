@@ -60,7 +60,7 @@ jobs:
           context: ./gateway
           file: ./gateway/Dockerfile
           push: true
-          # 构建多架构镜像（注意：使用 npm 进行构建时，因为有 better-sqlite3 C++ 编译，跨平台构建 ARM64 在 GitHub Actions 的 QEMU 模拟器下可能会较慢甚至超时。建议按需选择架构）
+          # 使用 node:sqlite，无需原生编译；如需多架构可扩展 platforms
           platforms: linux/amd64
           tags: ${{ steps.meta-gateway.outputs.tags }}
           labels: ${{ steps.meta-gateway.outputs.labels }}
