@@ -13,17 +13,19 @@ func main() {
 	// 加载探针本地配置
 	cfg := config.Load()
 
+	authEnabled := cfg.ProbeToken != ""
 	log.Printf(
-		"Starting probe: node=%s, gateway=%s",
+		"Starting probe: node=%s, gateway=%s, auth=%v",
 		cfg.NodeName,
 		cfg.GatewayWSURL,
+		authEnabled,
 	)
 
 	// 初始化 Bilibili 抓取客户端
 	biliClient := bilibili.NewClient(cfg.UserAgent)
 
 	// 初始化 Gateway WebSocket 客户端
-	ws := wsclient.New(cfg.GatewayWSURL, cfg.NodeName)
+	ws := wsclient.New(cfg.GatewayWSURL, cfg.NodeName, cfg.ProbeToken)
 
 	// 初始化任务轮询管理器
 	mgr := monitor.NewManager(biliClient, ws)

@@ -3,6 +3,7 @@ package wsclient
 import (
 	"encoding/json"
 	"log"
+	"net/http"
 	"sync"
 	"time"
 
@@ -54,6 +55,7 @@ type AssignmentHandler func(coreIDs, shardIDs []string, interval int)
 type Client struct {
 	url      string
 	nodeName string
+	token    string
 
 	mu   sync.Mutex
 	conn *websocket.Conn
@@ -66,10 +68,11 @@ type Client struct {
 // =========================
 // constructor
 // =========================
-func New(url, nodeName string) *Client {
+func New(url, nodeName, token string) *Client {
 	return &Client{
 		url:      url,
 		nodeName: nodeName,
+		token:    token,
 		sendCh:   make(chan Envelope, 256),
 	}
 }
@@ -128,7 +131,11 @@ func (c *Client) Run() {
 // connect
 // =========================
 func (c *Client) connect() error {
-	conn, _, err := websocket.DefaultDialer.Dial(c.url, nil)
+	header := http.Header{}
+	if c.token != "" {
+		header.Set("Authorization", "Bearer "+c.token)
+	}
+	conn, _, err := websocket.DefaultDialer.Dial(c.url, header)
 	if err != nil {
 		return err
 	}

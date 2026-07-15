@@ -1,9 +1,46 @@
 import { Elysia, t } from "elysia";
 import { node } from "@elysia/node";
 import { DatabaseSync } from "node:sqlite";
+import { timingSafeEqual } from "node:crypto";
 import * as fs from "fs";
 import * as path from "path";
 import { openapi } from "@elysia/openapi";
+
+// 探针共享密钥：未配置时开发环境放行；生产应通过 PROBE_TOKEN 注入
+const probeToken = process.env.PROBE_TOKEN || "";
+
+function extractBearerToken(authorization: string | undefined): string | null {
+  if (!authorization) return null;
+  const match = /^Bearer\s+(.+)$/i.exec(authorization.trim());
+  return match?.[1]?.trim() || null;
+}
+
+function tokensEqual(a: string, b: string): boolean {
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  if (bufA.length !== bufB.length) return false;
+  return timingSafeEqual(bufA, bufB);
+}
+
+function assertProbeAuthorized(headers: Record<string, string | undefined>) {
+  if (!probeToken) return;
+  const raw =
+    headers.authorization ??
+    headers.Authorization ??
+    headers["authorization"];
+  const token = extractBearerToken(raw);
+  if (!token || !tokensEqual(token, probeToken)) {
+    throw new Error("Unauthorized probe connection");
+  }
+}
+
+if (probeToken) {
+  console.log("[Auth] Probe WS authentication enabled (PROBE_TOKEN set)");
+} else {
+  console.log(
+    "[Auth] Probe WS authentication disabled (PROBE_TOKEN unset; dev mode)",
+  );
+}
 
 // 初始化 SQLite 数据库（Node.js 内置 node:sqlite）
 const dbPath =
@@ -353,6 +390,14 @@ function triggerReassignment() {
 const app = new Elysia({ adapter: node() })
   .use(openapi())
   .ws("/ws/probe", {
+    beforeHandle({ headers, set }) {
+      try {
+        assertProbeAuthorized(headers as Record<string, string | undefined>);
+      } catch {
+        set.status = 401;
+        throw new Error("Unauthorized probe connection");
+      }
+    },
     open(ws) {
       console.log(`WS connection opened, id: ${ws.id}`);
     },

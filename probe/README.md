@@ -16,11 +16,24 @@ Dockerfile                  多阶段构建,产出 distroless 极小镜像
 
 ## 核心行为
 
-1. 启动后连接 `GATEWAY_WS_URL`,发送 `register` 消息(带 `NODE_NAME`,由 k8s Downward API 注入)。
+1. 启动后连接 `GATEWAY_WS_URL`；若配置了 `PROBE_TOKEN`，握手携带 `Authorization: Bearer <token>`，然后发送 `register` 消息(带 `NODE_NAME`,由 k8s Downward API 注入)。
 2. 收到 gateway 回复的 `assignment` 消息后,为 `core_ids` + `shard_ids` 里的每个项目 id 各起一个轮询协程。
 3. 每个协程按 `poll_interval_ms` 轮询该项目的票务状态,与上一次结果做 diff,有变化就通过同一条连接批量上报 `diff` 消息。
 4. 收到 412(风控)时不会一直重试,会做指数退避;连接断开会自动重连并重新注册。
 5. gateway 随时可以推送 `reassignment` 消息(比如某个节点掉线触发了重新分片),探针据此增删轮询协程,无需重启。
+
+## 环境变量
+
+| 变量 | 默认 | 说明 |
+|------|------|------|
+| `NODE_NAME` | `unknown-node` | 节点名，上报给网关 |
+| `GATEWAY_WS_URL` | `ws://localhost:3000/ws/probe` | 网关探针 WS 地址 |
+| `PROBE_USER_AGENT` | 内置安卓 UA | 请求 B 站接口的 UA |
+| `PROBE_TOKEN` | 空 | 与网关共享密钥；空则不发 Header（需网关也未配置 `PROBE_TOKEN`） |
+
+本地联调可不设 `PROBE_TOKEN`。也可在 `probe/.env` 或 `probe/.env.local` 中配置（启动时自动加载，不覆盖已有系统环境变量）。
+
+生产与网关使用同一 Secret 注入；**网关与探针的 token 必须完全一致**。
 
 ## 本地构建
 

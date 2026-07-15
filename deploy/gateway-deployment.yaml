@@ -29,6 +29,12 @@ spec:
               value: "/data/gateway.db"
             - name: CONFIG_PATH
               value: "/config/config.json"
+            # 与探针共享的 WS 鉴权密钥（Authorization: Bearer）
+            - name: PROBE_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: probe-gateway-auth
+                  key: token
           ports:
             - name: http
               containerPort: 3000

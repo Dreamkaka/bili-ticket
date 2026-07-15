@@ -22,6 +22,11 @@ spec:
                   fieldPath: spec.nodeName
             - name: GATEWAY_WS_URL
               value: "ws://gateway.ticket-monitor.svc.cluster.local:3000/ws/probe"
+            - name: PROBE_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: probe-gateway-auth
+                  key: token
           resources:
             requests:
               cpu: "10m"
