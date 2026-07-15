@@ -1,23 +1,22 @@
 import type { NextConfig } from "next";
 
-/** @type {import('next').NextConfig} */
-const nextConfig = {
+const gateway =
+  process.env.GATEWAY_ORIGIN?.trim() || "http://127.0.0.1:3000";
+
+const nextConfig: NextConfig = {
   async rewrites() {
+    const base = gateway.replace(/\/$/, "");
     return [
       {
-        // 将前端 /api/:path* 代理到后端的 3000 端口
-        source: '/api/:path*',
-        destination: 'http://localhost:3000/api/:path*', 
+        source: "/api/:path*",
+        destination: `${base}/api/:path*`,
       },
       {
-        // 将前端 WebSocket 请求代理到后端的 3000 端口
-        source: '/ws/:path*',
-        destination: 'http://localhost:3000/ws/:path*',
-      }
+        source: "/ws/:path*",
+        destination: `${base}/ws/:path*`,
+      },
     ];
   },
 };
-
-module.exports = nextConfig;
 
 export default nextConfig;

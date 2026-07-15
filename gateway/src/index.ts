@@ -80,7 +80,8 @@ db.exec(`
     assigned_node TEXT,
     name TEXT,             -- 演出名称
     venue_name TEXT,       -- 场馆名称
-    cover TEXT             -- 海报图片链接
+    cover TEXT,            -- 海报图片链接
+    project_label TEXT     -- 展会/演出时间标签（如举办日期）
   );
 
   CREATE TABLE IF NOT EXISTS nodes (
@@ -129,6 +130,9 @@ try {
   }
   if (!columns.includes("cover")) {
     db.exec("ALTER TABLE projects ADD COLUMN cover TEXT;");
+  }
+  if (!columns.includes("project_label")) {
+    db.exec("ALTER TABLE projects ADD COLUMN project_label TEXT;");
   }
 } catch (e) {
   console.error("Database self-check / migration failed:", e);
@@ -193,6 +197,8 @@ async function fetchProjectMetadata(projectId: string) {
         name: json.data.name || "",
         venue_name: json.data.venue_info?.name || "",
         cover: coverUrl,
+        // 展会举办时间标签，例如 "2026.07.18 - 2026.07.20"
+        project_label: json.data.project_label || "",
         tickets: tickets,
       };
     } else {
@@ -240,13 +246,14 @@ async function syncProjectsFromConfig() {
     }
 
     const insertProj = db.prepare(`
-      INSERT INTO projects (id, type, name, venue_name, cover)
-      VALUES (?, ?, ?, ?, ?)
+      INSERT INTO projects (id, type, name, venue_name, cover, project_label)
+      VALUES (?, ?, ?, ?, ?, ?)
       ON CONFLICT(id) DO UPDATE SET
         type = excluded.type,
         name = COALESCE(excluded.name, projects.name),
         venue_name = COALESCE(excluded.venue_name, projects.venue_name),
-        cover = COALESCE(excluded.cover, projects.cover)
+        cover = COALESCE(excluded.cover, projects.cover),
+        project_label = COALESCE(excluded.project_label, projects.project_label)
     `);
 
     const upsertTicketFromMeta = db.prepare(`
@@ -273,6 +280,7 @@ async function syncProjectsFromConfig() {
           meta.name || null,
           meta.venue_name || null,
           meta.cover || null,
+          meta.project_label || null,
         );
 
         const now = Date.now();
@@ -295,7 +303,7 @@ async function syncProjectsFromConfig() {
         console.warn(
           `[Meta Sync] Warn: could not fetch details for project [${task.id}], inserting blank metadata instead.`,
         );
-        insertProj.run(task.id, task.type, null, null, null);
+        insertProj.run(task.id, task.type, null, null, null, null);
       }
     }
 
@@ -389,6 +397,25 @@ function triggerReassignment() {
 
 const app = new Elysia({ adapter: node() })
   .use(openapi())
+  // 允许 web(如 :4000) 直连 gateway(:3000) 时的跨域；同源代理场景也无害
+  .onRequest(({ request, set }) => {
+    const origin = request.headers.get("origin");
+    if (origin) {
+      set.headers["Access-Control-Allow-Origin"] = origin;
+      set.headers["Access-Control-Allow-Credentials"] = "true";
+      set.headers["Vary"] = "Origin";
+    } else {
+      set.headers["Access-Control-Allow-Origin"] = "*";
+    }
+    set.headers["Access-Control-Allow-Methods"] =
+      "GET,POST,PUT,PATCH,DELETE,OPTIONS";
+    set.headers["Access-Control-Allow-Headers"] =
+      "Content-Type, Authorization, X-Requested-With";
+  })
+  .options("/*", ({ set }) => {
+    set.status = 204;
+    return "";
+  })
   .ws("/ws/probe", {
     beforeHandle({ headers, set }) {
       try {
@@ -620,7 +647,7 @@ const app = new Elysia({ adapter: node() })
 
         const projects = db
           .prepare(
-            "SELECT id, type, assigned_node, name, venue_name, cover FROM projects",
+            "SELECT id, type, assigned_node, name, venue_name, cover, project_label FROM projects",
           )
           .all();
         const nodes = db
@@ -678,7 +705,7 @@ const app = new Elysia({ adapter: node() })
 
         const projects = db
           .prepare(
-            "SELECT id, type, assigned_node, name, venue_name, cover FROM projects",
+            "SELECT id, type, assigned_node, name, venue_name, cover, project_label FROM projects",
           )
           .all();
         const nodes = db
@@ -737,7 +764,7 @@ const app = new Elysia({ adapter: node() })
     try {
       const projects = db
         .prepare(
-          "SELECT id, type, assigned_node, name, venue_name, cover FROM projects",
+          "SELECT id, type, assigned_node, name, venue_name, cover, project_label FROM projects",
         )
         .all();
       return projects;
@@ -793,7 +820,7 @@ setInterval(() => {
   try {
     const projects = db
       .prepare(
-        "SELECT id, type, assigned_node, name, venue_name, cover FROM projects",
+        "SELECT id, type, assigned_node, name, venue_name, cover, project_label FROM projects",
       )
       .all();
     const nodes = db
