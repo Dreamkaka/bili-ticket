@@ -85,19 +85,19 @@ export function BootSequence({
                 <BootMark />
               </div>
 
-              <div className="absolute right-5 bottom-8 max-w-[14rem] text-right sm:right-8 sm:bottom-10">
+              <div className="absolute right-3 bottom-6 max-w-[11rem] text-right sm:right-8 sm:bottom-10 sm:max-w-[14rem]">
                 <div className="mb-2 flex items-center justify-end gap-2">
                   <span className="h-1.5 w-1.5 rounded-full bg-accent shadow-[0_0_8px_color-mix(in_oklab,var(--accent)_70%,transparent)]" />
-                  <p className="text-[9px] tracking-[0.2em] text-[var(--ink-faint)] uppercase">
+                  <p className="text-[8px] tracking-[0.16em] text-[var(--ink-faint)] uppercase sm:text-[9px] sm:tracking-[0.2em]">
                     Mission Dependent Payload
                   </p>
                 </div>
-                <p className="text-[9px] tracking-[0.28em] text-[var(--ink-faint)]/70 uppercase">
+                <p className="hidden text-[9px] tracking-[0.28em] text-[var(--ink-faint)]/70 uppercase sm:block">
                   System Interfaces
                 </p>
-                <div className="mt-2 ml-auto h-px w-24 bg-gradient-to-l from-[var(--hairline)] to-transparent" />
-                <p className="mt-3 text-[10px] tracking-[0.22em] text-[var(--ink-soft)]">
-                 感谢游戏连接彼此，也谢谢你跨越人海 与我们一起同行
+                <div className="mt-2 ml-auto h-px w-16 bg-gradient-to-l from-[var(--hairline)] to-transparent sm:w-24" />
+                <p className="mt-2 text-[9px] leading-relaxed tracking-[0.12em] text-[var(--ink-soft)] sm:mt-3 sm:text-[10px] sm:tracking-[0.22em]">
+                  感谢游戏连接彼此，也谢谢你跨越人海 与我们一起同行
                 </p>
               </div>
             </>

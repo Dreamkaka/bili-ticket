@@ -20,9 +20,13 @@ import {
 } from "@/lib/diff";
 
 /** 行高估算（含 padding），用于虚拟窗口 */
-const ROW_H = 92;
+const ROW_H = 96;
 const OVERSCAN = 8;
-const VIEWPORT_H = 520;
+
+function streamViewportHeight(): number {
+  if (typeof window === "undefined") return 420;
+  return Math.min(520, Math.max(280, Math.round(window.innerHeight * 0.55)));
+}
 
 const EventRow = memo(function EventRow({
   diff,
@@ -37,7 +41,7 @@ const EventRow = memo(function EventRow({
     <button
       type="button"
       onClick={() => onSelect?.(diff)}
-      className="group flex h-full w-full gap-3 px-5 py-3.5 text-left transition-colors duration-200 hover:bg-[var(--panel-strong)] sm:gap-4"
+      className="group flex h-full w-full gap-3 px-4 py-3.5 text-left transition-colors duration-200 hover:bg-[var(--panel-strong)] sm:gap-4 sm:px-5"
     >
       {diff.project_cover ? (
         // eslint-disable-next-line @next/next/no-img-element
@@ -117,13 +121,21 @@ export const EventStream = memo(function EventStream({
   onSelectDiff?: (diff: Diff) => void;
 }) {
   const [filter, setFilter] = useState<FeedFilter>("all");
+  const [viewportH, setViewportH] = useState(420);
   const list = useMemo(() => filterDiffs(diffs, filter), [diffs, filter]);
   const scrollerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const sync = () => setViewportH(streamViewportHeight());
+    sync();
+    window.addEventListener("resize", sync);
+    return () => window.removeEventListener("resize", sync);
+  }, []);
 
   const { onScroll, totalH, start, end, offsetY, resetScroll } = useVirtualWindow(
     list.length,
     ROW_H,
-    VIEWPORT_H
+    viewportH
   );
 
   // 过滤切换时回到顶部，避免窗口偏移错位
@@ -136,7 +148,7 @@ export const EventStream = memo(function EventStream({
 
   return (
     <div id="events" className="reveal-child theme-panel section-block border [--reveal-delay:180ms]">
-      <div className="theme-hairline flex flex-col gap-3 border-b px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="theme-hairline flex flex-col gap-3 border-b px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between sm:px-5 sm:py-4">
         <div>
           <p className="text-[10px] font-semibold tracking-[0.25em] text-accent">
             EVENTS
@@ -152,7 +164,7 @@ export const EventStream = memo(function EventStream({
                 key={f.id}
                 type="button"
                 onClick={() => setFilter(f.id)}
-                className={`px-2.5 py-1 text-xs font-medium transition-all duration-300 ${
+                className={`min-h-9 px-2.5 py-1.5 text-xs font-medium transition-all duration-300 sm:min-h-0 sm:py-1 ${
                   active
                     ? "bg-accent text-accent-foreground"
                     : "theme-ink-faint border border-[var(--hairline)] hover:text-ink"
@@ -173,7 +185,7 @@ export const EventStream = memo(function EventStream({
         <div
           ref={scrollerRef}
           className="overflow-y-auto overscroll-contain"
-          style={{ height: VIEWPORT_H }}
+          style={{ height: viewportH }}
           onScroll={onScroll}
         >
           <div style={{ height: totalH, position: "relative" }}>

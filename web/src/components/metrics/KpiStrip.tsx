@@ -27,15 +27,15 @@ export const KpiStrip = memo(function KpiStrip({
       {ITEMS.map((item) => (
         <div
           key={item.key}
-          className="theme-panel px-5 py-5 transition-colors duration-300 hover:bg-[var(--panel-strong)]"
+          className="theme-panel px-3 py-4 transition-colors duration-300 hover:bg-[var(--panel-strong)] sm:px-5 sm:py-5"
         >
-          <div className="theme-ink-faint flex items-center gap-2 text-[10px] tracking-[0.2em]">
+          <div className="theme-ink-faint flex items-center gap-1.5 text-[9px] tracking-[0.16em] sm:gap-2 sm:text-[10px] sm:tracking-[0.2em]">
             <span className="text-accent">{item.en}</span>
             <span>{item.label}</span>
           </div>
           <p
             key={`${item.key}-${values[item.key]}`}
-            className="theme-ink animate-fade-in-up mt-3 text-3xl font-light tracking-tight tabular-nums"
+            className="theme-ink animate-fade-in-up mt-2 text-2xl font-light tracking-tight tabular-nums sm:mt-3 sm:text-3xl"
           >
             {values[item.key]}
           </p>

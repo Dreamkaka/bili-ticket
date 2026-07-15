@@ -149,7 +149,7 @@ export default function Home() {
               registerProgressEl={registerProgressEl}
             />
 
-            <div className="relative w-full space-y-10 px-4 py-10 sm:px-6 sm:py-12 lg:px-8 lg:space-y-14">
+            <div className="relative w-full space-y-8 px-3 py-8 sm:space-y-10 sm:px-6 sm:py-12 lg:space-y-14 lg:px-8">
               <RevealSection>
                 <KpiStrip
                   projects={projects.length}

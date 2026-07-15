@@ -28,7 +28,7 @@ export const StockChart = memo(function StockChart({
         </div>
         <span className="theme-ink-faint font-mono text-xs">{data.length} pts</span>
       </div>
-      <div className="h-56 w-full">
+      <div className="h-48 w-full sm:h-56">
         {data.length > 0 ? (
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart

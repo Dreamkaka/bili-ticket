@@ -38,23 +38,22 @@ export const FeatureBanner = memo(function FeatureBanner({
   const animKey = project?.id ?? "empty";
 
   return (
-    <div className="relative flex h-full w-full flex-col justify-end overflow-hidden p-6 sm:p-10 lg:p-12 lg:pb-16">
+    <div className="relative flex h-full w-full flex-col justify-end overflow-hidden p-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:p-8 sm:pb-10 lg:p-12 lg:pb-16">
       <HeroReadabilityScrim />
 
-      {/* BREAKING：左下大水印，在文案下方层级 */}
+      {/* BREAKING：手机缩小，避免抢占阅读区 */}
       <div
         key={`breaking-${animKey}`}
-        className="pointer-events-none absolute bottom-4 left-4 z-0 select-none sm:bottom-6 sm:left-8 lg:bottom-8 lg:left-10"
+        className="pointer-events-none absolute bottom-3 left-3 z-0 select-none sm:bottom-6 sm:left-8 lg:bottom-8 lg:left-10"
         aria-hidden
       >
-        <span className="animate-fade-in-scale block text-[clamp(3rem,12vw,8rem)] leading-[0.85] font-black tracking-tighter text-white/[0.07]">
+        <span className="animate-fade-in-scale block text-[clamp(2.25rem,11vw,8rem)] leading-[0.85] font-black tracking-tighter text-white/[0.06] sm:text-white/[0.07]">
           BREAKING
         </span>
       </div>
 
-      {/* 全部信息左下 */}
-      <div key={animKey} className="relative z-[1] w-full min-w-0 max-w-3xl">
-        <div className="animate-fade-in-left mb-3 flex flex-wrap items-center gap-2">
+      <div key={animKey} className="relative z-[1] w-full min-w-0 max-w-3xl pr-16 sm:pr-24">
+        <div className="animate-fade-in-left mb-2 flex flex-wrap items-center gap-2 sm:mb-3">
           {project && (
             <span className="bg-accent px-2 py-0.5 text-[10px] font-bold tracking-wider text-accent-foreground uppercase">
               {project.type}
@@ -68,13 +67,13 @@ export const FeatureBanner = memo(function FeatureBanner({
         </div>
 
         <h2
-          className="animate-fade-in-up anim-delay-1 line-clamp-3 break-all text-2xl font-bold leading-tight tracking-wide text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.7)] sm:text-4xl lg:text-5xl"
+          className="animate-fade-in-up anim-delay-1 line-clamp-3 break-words text-xl font-bold leading-snug tracking-wide text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.7)] sm:text-3xl sm:leading-tight lg:text-5xl"
           title={project?.name || undefined}
         >
           {project?.name || "等待监控数据"}
         </h2>
         <p
-          className="animate-fade-in-up anim-delay-2 mt-3 truncate text-sm tracking-wide text-white/85 drop-shadow sm:text-base"
+          className="animate-fade-in-up anim-delay-2 mt-2 line-clamp-2 text-xs tracking-wide text-white/85 drop-shadow sm:mt-3 sm:line-clamp-1 sm:truncate sm:text-base"
           title={
             [project?.project_label, project?.venue_name]
               .filter(Boolean)
@@ -86,9 +85,9 @@ export const FeatureBanner = memo(function FeatureBanner({
             .join(" · ") || "场地信息加载中…"}
         </p>
 
-        <div className="animate-fade-in-up anim-delay-3 mt-4 flex flex-wrap items-center gap-3">
+        <div className="animate-fade-in-up anim-delay-3 mt-3 flex flex-wrap items-center gap-2 sm:mt-4 sm:gap-3">
           <Button
-            className="rounded-none bg-accent px-5 font-semibold text-accent-foreground shadow-lg transition-transform duration-300 hover:scale-[1.02] active:scale-[0.98]"
+            className="min-h-11 rounded-none bg-accent px-4 font-semibold text-accent-foreground shadow-lg transition-transform duration-300 hover:scale-[1.02] active:scale-[0.98] sm:min-h-10 sm:px-5"
             onPress={onOpenProject}
             isDisabled={!project || !onOpenProject}
           >
@@ -107,7 +106,7 @@ export const FeatureBanner = memo(function FeatureBanner({
           ) : null}
         </div>
 
-        <div className="animate-fade-in-up anim-delay-4 mt-6 max-w-md space-y-2">
+        <div className="animate-fade-in-up anim-delay-4 mt-4 max-w-md space-y-2 sm:mt-6">
           <div className="h-0.5 overflow-hidden bg-white/20">
             <div
               className="h-full bg-accent transition-[width] duration-700 ease-out"
@@ -127,7 +126,7 @@ export const FeatureBanner = memo(function FeatureBanner({
             <button
               type="button"
               onClick={onResumeAutoplay}
-              className="animate-fade-in text-[10px] tracking-[0.2em] text-white/60 transition-colors duration-300 hover:text-accent"
+              className="animate-fade-in min-h-9 text-[10px] tracking-[0.2em] text-white/60 transition-colors duration-300 hover:text-accent"
             >
               恢复自动轮播 ›
             </button>
@@ -135,20 +134,20 @@ export const FeatureBanner = memo(function FeatureBanner({
         </div>
       </div>
 
-      {/* 独立右下项目计数 */}
+      {/* 右下项目计数：手机缩小，避免压住文案 */}
       <div
         key={`counter-${animKey}`}
-        className="animate-fade-in-scale anim-delay-3 absolute right-6 bottom-8 z-[2] shrink-0 text-right sm:right-10 sm:bottom-10 lg:right-12 lg:bottom-14"
+        className="animate-fade-in-scale anim-delay-3 absolute right-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-[2] shrink-0 text-right sm:right-8 sm:bottom-8 lg:right-12 lg:bottom-14"
       >
-        <div className="flex items-baseline justify-end gap-1.5">
-          <span className="text-3xl font-light text-accent tabular-nums drop-shadow sm:text-4xl">
+        <div className="flex items-baseline justify-end gap-1 sm:gap-1.5">
+          <span className="text-2xl font-light text-accent tabular-nums drop-shadow sm:text-3xl lg:text-4xl">
             {padIndex(index)}
           </span>
-          <span className="text-xs tracking-[0.2em] text-white/55">
+          <span className="text-[10px] tracking-[0.2em] text-white/55 sm:text-xs">
             // {padIndex(Math.max(total, 1))}
           </span>
         </div>
-        <div className="mt-1 text-[10px] tracking-[0.3em] text-white/45">
+        <div className="mt-0.5 text-[9px] tracking-[0.25em] text-white/45 sm:mt-1 sm:text-[10px] sm:tracking-[0.3em]">
           PROJECTS
         </div>
       </div>

@@ -31,9 +31,12 @@ export const HeroStage = memo(function HeroStage({
   };
 
   return (
-    <section id="home" className="relative pt-14 lg:pt-16">
-      {/* 明确视口高度，保证 Banner justify-end 贴底 */}
-      <div className="relative h-[calc(100dvh-3.5rem)] w-full lg:h-[calc(100dvh-4rem)]">
+    <section
+      id="home"
+      /* 顶栏：手机两行 ~6.5rem；桌面单行 3.5/4rem；含 safe-area */
+      className="relative pt-[calc(6.25rem+env(safe-area-inset-top,0px))] md:pt-[calc(3.5rem+env(safe-area-inset-top,0px))] lg:pt-[calc(4rem+env(safe-area-inset-top,0px))]"
+    >
+      <div className="relative h-[min(92dvh,calc(100dvh-6.25rem-env(safe-area-inset-top,0px)))] w-full md:h-[calc(100dvh-3.5rem-env(safe-area-inset-top,0px))] lg:h-[calc(100dvh-4rem-env(safe-area-inset-top,0px))]">
         <FeatureBanner
           project={focusProject}
           tickets={focusTickets}

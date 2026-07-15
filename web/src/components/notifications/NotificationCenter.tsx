@@ -50,7 +50,7 @@ export function NotificationCenter({
       <Modal.Container className="items-center justify-center" placement="center">
         <Modal.Dialog
           aria-label="票务通知"
-          className="theme-panel mx-auto w-[min(100vw-1.5rem,28rem)] overflow-hidden rounded-sm border p-0 shadow-2xl"
+          className="theme-panel mx-auto mb-[env(safe-area-inset-bottom,0px)] w-[min(100vw-1rem,28rem)] overflow-hidden rounded-sm border p-0 shadow-2xl"
         >
           <div className="theme-hairline flex items-center justify-between border-b px-4 py-3">
             <div>
@@ -88,7 +88,7 @@ export function NotificationCenter({
             })}
           </div>
 
-          <div className="max-h-[min(55vh,24rem)] overflow-y-auto">
+          <div className="max-h-[min(65dvh,24rem)] overflow-y-auto">
             {list.length === 0 ? (
               <p className="theme-ink-faint px-4 py-10 text-center text-sm">
                 暂无通知

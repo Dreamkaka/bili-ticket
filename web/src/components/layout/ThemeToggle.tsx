@@ -11,7 +11,7 @@ export function ThemeToggle() {
       type="button"
       onClick={toggleTheme}
       disabled={!ready}
-      className="flex h-8 w-8 items-center justify-center border border-border bg-surface/80 text-foreground transition-all duration-300 hover:border-accent/50 hover:text-accent disabled:opacity-50"
+      className="flex h-9 w-9 items-center justify-center border border-border bg-surface/80 text-foreground transition-all duration-300 hover:border-accent/50 hover:text-accent disabled:opacity-50 sm:h-8 sm:w-8"
       aria-label={isDark ? "切换到日间模式" : "切换到夜间模式"}
       title={isDark ? "日间模式" : "夜间模式"}
     >

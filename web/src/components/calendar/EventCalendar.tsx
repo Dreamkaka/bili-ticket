@@ -99,7 +99,7 @@ export const EventCalendar = memo(function EventCalendar({
 
   return (
     <div className="grid grid-cols-1 gap-6 xl:grid-cols-12">
-      <div className="reveal-child theme-panel min-w-0 border p-4 xl:col-span-5 [--reveal-delay:100ms]">
+      <div className="reveal-child theme-panel min-w-0 border p-3 sm:p-4 xl:col-span-5 [--reveal-delay:100ms]">
         <Calendar
           aria-label="活动日历"
           className="w-full max-w-none bg-transparent shadow-none"
@@ -196,7 +196,7 @@ export const EventCalendar = memo(function EventCalendar({
                   data-cursor="pointer"
                   onClick={() => openProject(project)}
                   style={{ animationDelay: `${Math.min(index, 8) * 45}ms` }}
-                  className="stagger-item theme-hairline flex w-full items-start gap-3 border-b px-4 py-3.5 text-left transition-colors last:border-b-0 hover:bg-accent/10 sm:px-5"
+                  className="stagger-item theme-hairline flex min-h-14 w-full items-start gap-3 border-b px-3 py-3.5 text-left transition-colors last:border-b-0 hover:bg-accent/10 sm:min-h-0 sm:px-5"
                 >
                   <div className="min-w-0 flex-1">
                     <div className="flex min-w-0 items-center gap-2">

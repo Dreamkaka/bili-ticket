@@ -41,11 +41,11 @@ export function SiteNav({
   const mod = modKeyLabel();
 
   return (
-    <header className="theme-nav fixed inset-x-0 top-0 z-50 border-b">
-      <div className="flex h-14 w-full items-center justify-between gap-4 px-4 sm:h-16 sm:px-6 lg:px-8">
-        <a href="#home" className="flex shrink-0 items-center gap-3">
-          <div className="flex h-8 items-center border-l-2 border-accent pl-2">
-            <span className="theme-ink text-sm font-semibold tracking-[0.2em]">
+    <header className="theme-nav fixed inset-x-0 top-0 z-50 border-b pt-[env(safe-area-inset-top,0px)]">
+      <div className="flex h-12 w-full items-center justify-between gap-2 px-3 sm:h-14 sm:gap-4 sm:px-6 lg:h-16 lg:px-8">
+        <a href="#home" className="flex min-w-0 shrink-0 items-center gap-2 sm:gap-3">
+          <div className="flex h-7 items-center border-l-2 border-accent pl-2 sm:h-8">
+            <span className="theme-ink text-xs font-semibold tracking-[0.18em] sm:text-sm sm:tracking-[0.2em]">
               我tm票呢
             </span>
           </div>
@@ -54,6 +54,7 @@ export function SiteNav({
           </span>
         </a>
 
+        {/* 桌面：EN + 中文双行导航 */}
         <nav className="hidden items-center gap-1 md:flex lg:gap-2">
           {NAV.map((item) => {
             const isActive = active === item.id;
@@ -76,12 +77,12 @@ export function SiteNav({
           })}
         </nav>
 
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
           {onOpenNotifications ? (
             <button
               type="button"
               onClick={onOpenNotifications}
-              className="theme-ink-faint relative flex h-8 w-8 items-center justify-center border border-border bg-surface/80 transition-colors hover:border-accent/50 hover:text-accent"
+              className="theme-ink-faint relative flex h-9 w-9 items-center justify-center border border-border bg-surface/80 transition-colors hover:border-accent/50 hover:text-accent sm:h-8 sm:w-8"
               aria-label={
                 unreadCount > 0
                   ? `打开通知，${unreadCount} 条未读`
@@ -146,6 +147,29 @@ export function SiteNav({
           </span>
         </div>
       </div>
+
+      {/* 手机：中文短链横向滑动 */}
+      <nav
+        className="nav-scroll flex gap-1 overflow-x-auto border-t border-[var(--hairline)] px-3 py-1.5 md:hidden"
+        aria-label="页面导航"
+      >
+        {NAV.map((item) => {
+          const isActive = active === item.id;
+          return (
+            <a
+              key={item.id}
+              href={item.href}
+              className={`snap-start shrink-0 rounded-sm px-3 py-1.5 text-xs font-medium tracking-wide transition-colors ${
+                isActive
+                  ? "bg-accent/15 text-accent"
+                  : "theme-ink-faint hover:text-ink"
+              }`}
+            >
+              {item.zh}
+            </a>
+          );
+        })}
+      </nav>
     </header>
   );
 }

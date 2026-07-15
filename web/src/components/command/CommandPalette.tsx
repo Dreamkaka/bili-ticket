@@ -262,7 +262,7 @@ export function CommandPalette({
       <Modal.Container className="items-center justify-center" placement="center">
         <Modal.Dialog
           aria-label="命令面板"
-          className="theme-panel mx-auto w-[min(100vw-1.5rem,32rem)] overflow-hidden rounded-sm border p-0 shadow-2xl"
+          className="theme-panel mx-auto mb-[env(safe-area-inset-bottom,0px)] w-[min(100vw-1rem,32rem)] overflow-hidden rounded-sm border p-0 shadow-2xl"
         >
           <div className="border-b border-[var(--hairline)] px-3 py-2.5">
             <div className="flex items-center gap-2">
@@ -273,7 +273,7 @@ export function CommandPalette({
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={onKeyDown}
                 placeholder="搜索命令、页面或项目…"
-                className="theme-ink min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-[var(--ink-faint)]"
+                className="theme-ink min-w-0 flex-1 bg-transparent text-base outline-none placeholder:text-[var(--ink-faint)] sm:text-sm"
                 aria-label="命令搜索"
                 autoComplete="off"
                 spellCheck={false}
@@ -286,7 +286,7 @@ export function CommandPalette({
 
           <div
             ref={listRef}
-            className="max-h-[min(50vh,22rem)] overflow-y-auto overscroll-contain py-1"
+            className="max-h-[min(60dvh,22rem)] overflow-y-auto overscroll-contain py-1"
             role="listbox"
             aria-label="命令列表"
           >
