@@ -8,11 +8,11 @@ crons = ["* * * * *"]
 
 [[kv_namespaces]]
 binding = "PROBE_STATE"
-id = "REPLACE_WITH_KV_NAMESPACE_ID"
-preview_id = "REPLACE_WITH_KV_PREVIEW_ID"
+id = "nothing"
+preview_id = "nothing"
 
 [vars]
-NODE_NAME = "cf-worker-monitor"
+NODE_NAME = "cf-worker-qika"
 # 可选：冷启动种子，与 gateway/config.json 对齐，减少对 targets 的依赖
 # CORE_IDS = "1003349,1003397,1001279"
 # SHARD_IDS = "1002403,111639"

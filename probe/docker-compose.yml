@@ -1,7 +1,6 @@
 services:
   probe:
-    build: .
-    image: ghcr.io/dreamkaka/bili-ticket/ticket-gateway
+    image: ghcr.io/dreamkaka/bili-ticket/ticket-probe
     container_name: ticket-probe
     environment:
       NODE_NAME: ${NODE_NAME:-docker-probe}

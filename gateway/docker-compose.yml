@@ -1,6 +1,5 @@
 services:
   gateway:
-    build: .
     image: ghcr.io/dreamkaka/bili-ticket/ticket-gateway:latest
     container_name: ticket-gateway
     ports:
