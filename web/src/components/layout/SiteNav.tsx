@@ -20,12 +20,16 @@ export function SiteNav({
   lastUpdate,
   active = "home",
   onOpenCommand,
+  onOpenNotifications,
+  unreadCount = 0,
 }: {
   connectionStatus: ConnectionStatus;
   systemHealthy: boolean;
   lastUpdate: number | null;
   active?: string;
   onOpenCommand?: () => void;
+  onOpenNotifications?: () => void;
+  unreadCount?: number;
 }) {
   const connLabel =
     connectionStatus === "connected"
@@ -41,7 +45,9 @@ export function SiteNav({
       <div className="flex h-14 w-full items-center justify-between gap-4 px-4 sm:h-16 sm:px-6 lg:px-8">
         <a href="#home" className="flex shrink-0 items-center gap-3">
           <div className="flex h-8 items-center border-l-2 border-accent pl-2">
-            <span className="theme-ink text-sm font-semibold tracking-[0.2em]">我tm票呢</span>
+            <span className="theme-ink text-sm font-semibold tracking-[0.2em]">
+              我tm票呢
+            </span>
           </div>
           <span className="theme-ink-faint hidden text-[10px] tracking-[0.25em] sm:inline">
             where are my ticket?!
@@ -71,6 +77,39 @@ export function SiteNav({
         </nav>
 
         <div className="flex items-center gap-2">
+          {onOpenNotifications ? (
+            <button
+              type="button"
+              onClick={onOpenNotifications}
+              className="theme-ink-faint relative flex h-8 w-8 items-center justify-center border border-border bg-surface/80 transition-colors hover:border-accent/50 hover:text-accent"
+              aria-label={
+                unreadCount > 0
+                  ? `打开通知，${unreadCount} 条未读`
+                  : "打开通知"
+              }
+              title="票务通知"
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden>
+                <path
+                  d="M6 9a6 6 0 1 1 12 0c0 3.5 1.5 5 2 6H4c.5-1 2-2.5 2-6Z"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinejoin="round"
+                />
+                <path
+                  d="M10 18a2 2 0 0 0 4 0"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                />
+              </svg>
+              {unreadCount > 0 ? (
+                <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-accent px-1 text-[9px] font-bold text-accent-foreground">
+                  {unreadCount > 99 ? "99+" : unreadCount}
+                </span>
+              ) : null}
+            </button>
+          ) : null}
           {onOpenCommand ? (
             <button
               type="button"

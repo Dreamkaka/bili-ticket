@@ -25,6 +25,7 @@ export function CommandPalette({
   lastUpdate,
   systemHealthy,
   onSelectProject,
+  onOpenNotifications,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -33,6 +34,7 @@ export function CommandPalette({
   lastUpdate: number | null;
   systemHealthy: boolean;
   onSelectProject?: (id: string) => void;
+  onOpenNotifications?: () => void;
 }) {
   const { theme, toggleTheme } = useTheme();
   const [query, setQuery] = useState("");
@@ -105,6 +107,14 @@ export function CommandPalette({
 
     const actions: CommandItem[] = [
       {
+        id: "action-notifications",
+        group: "action",
+        label: "打开票务通知",
+        description: "ALERTS · Toast 历史",
+        keywords: ["notify", "toast", "通知", "提醒", "动态", "alert"],
+        run: () => onOpenNotifications?.(),
+      },
+      {
         id: "action-theme",
         group: "action",
         label: theme === "dark" ? "切换到日间模式" : "切换到夜间模式",
@@ -168,6 +178,7 @@ export function CommandPalette({
     toggleTheme,
     projects,
     onSelectProject,
+    onOpenNotifications,
   ]);
 
   const filtered = useMemo(() => {

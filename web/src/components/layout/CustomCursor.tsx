@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 
 const RING_LERP = 0.18;
 const HOVER_SCALE = 1.55;
+const BASE = 28;
 
 function isInteractive(el: EventTarget | null): boolean {
   if (!(el instanceof Element)) return false;
@@ -16,14 +17,14 @@ function isInteractive(el: EventTarget | null): boolean {
 
 export function CustomCursor() {
   const [enabled, setEnabled] = useState(false);
-  const [visible, setVisible] = useState(false);
-  const [hovering, setHovering] = useState(false);
-
+  const rootRef = useRef<HTMLDivElement>(null);
   const dotRef = useRef<HTMLDivElement>(null);
   const ringRef = useRef<HTMLDivElement>(null);
   const pos = useRef({ x: 0, y: 0 });
   const ring = useRef({ x: 0, y: 0 });
   const raf = useRef(0);
+  const visibleRef = useRef(false);
+  const hoveringRef = useRef(false);
 
   useEffect(() => {
     const fine = window.matchMedia("(pointer: fine)");
@@ -44,6 +45,26 @@ export function CustomCursor() {
     if (!enabled) return;
 
     document.documentElement.classList.add("custom-cursor");
+
+    const setVisible = (v: boolean) => {
+      if (visibleRef.current === v) return;
+      visibleRef.current = v;
+      const root = rootRef.current;
+      if (root) root.style.opacity = v ? "1" : "0";
+    };
+
+    const setHovering = (v: boolean) => {
+      if (hoveringRef.current === v) return;
+      hoveringRef.current = v;
+      const ringEl = ringRef.current;
+      if (!ringEl) return;
+      const size = v ? BASE * HOVER_SCALE : BASE;
+      ringEl.style.width = `${size}px`;
+      ringEl.style.height = `${size}px`;
+      ringEl.style.borderColor = v
+        ? "rgba(255,255,255,1)"
+        : "rgba(255,255,255,0.85)";
+    };
 
     const onMove = (e: MouseEvent) => {
       pos.current.x = e.clientX;
@@ -97,28 +118,21 @@ export function CustomCursor() {
 
   return (
     <div
-      className={`pointer-events-none fixed inset-0 z-[200] transition-opacity duration-200 ${
-        visible ? "opacity-100" : "opacity-0"
-      }`}
+      ref={rootRef}
+      className="pointer-events-none fixed inset-0 z-[200] opacity-0 transition-opacity duration-200"
       aria-hidden
     >
       <div
         ref={ringRef}
         className="absolute top-0 left-0 will-change-transform"
         style={{
-          width: 28,
-          height: 28,
+          width: BASE,
+          height: BASE,
           borderRadius: "9999px",
           border: "1.5px solid rgba(255,255,255,0.85)",
           boxShadow: "0 0 0 1px rgba(0,0,0,0.25)",
-          transition: "width 0.2s var(--ease-out-soft), height 0.2s var(--ease-out-soft), border-color 0.2s ease",
-          ...(hovering
-            ? {
-                width: 28 * HOVER_SCALE,
-                height: 28 * HOVER_SCALE,
-                borderColor: "rgba(255,255,255,1)",
-              }
-            : null),
+          transition:
+            "width 0.2s var(--ease-out-soft), height 0.2s var(--ease-out-soft), border-color 0.2s ease",
         }}
       />
       <div

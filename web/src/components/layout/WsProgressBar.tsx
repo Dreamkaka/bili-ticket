@@ -1,16 +1,20 @@
 "use client";
 
+import { memo, useRef } from "react";
 import type { ConnectionStatus } from "@/lib/types";
+import { useWsProgressBarDom } from "@/hooks/useWsUpdateProgress";
 
-export function WsProgressBar({
-  progress,
+export const WsProgressBar = memo(function WsProgressBar({
+  lastUpdate,
   connectionStatus,
 }: {
-  progress: number;
+  lastUpdate: number | null;
   connectionStatus: ConnectionStatus;
 }) {
+  const fillRef = useRef<HTMLDivElement>(null);
   const active = connectionStatus === "connected";
-  const width = active ? Math.min(100, Math.max(0, progress * 100)) : 0;
+
+  useWsProgressBarDom(fillRef, lastUpdate, connectionStatus);
 
   return (
     <div
@@ -20,12 +24,13 @@ export function WsProgressBar({
     >
       <div className="h-0.5 w-full bg-[var(--hairline)]">
         <div
+          ref={fillRef}
           className={`h-full will-change-[width] ${
             active ? "bg-accent" : "bg-danger/70"
           }`}
-          style={{ width: `${width}%` }}
+          style={{ width: "0%" }}
         />
       </div>
     </div>
   );
-}
+});

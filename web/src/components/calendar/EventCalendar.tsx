@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
 import { Calendar } from "@heroui/react";
 import {
   getLocalTimeZone,
@@ -20,7 +20,14 @@ import {
 import { isAvailableStatus } from "@/lib/status";
 import { scrollToId } from "@/lib/command";
 
-export function EventCalendar({
+function calendarSignature(projects: Project[]): string {
+  return projects
+    .map((p) => `${p.id}:${p.project_label ?? ""}`)
+    .sort()
+    .join("|");
+}
+
+export const EventCalendar = memo(function EventCalendar({
   projects,
   tickets = [],
   onSelectProject,
@@ -29,12 +36,28 @@ export function EventCalendar({
   tickets?: Ticket[];
   onSelectProject?: (id: string) => void;
 }) {
-  const eventMap = useMemo(() => buildEventDateMap(projects), [projects]);
+  const calSig = useMemo(() => calendarSignature(projects), [projects]);
+  const eventMap = useMemo(
+    () => buildEventDateMap(projects),
+    // 仅 label/id 变化时重建
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [calSig]
+  );
   const eventDayCount = countEventDays(eventMap);
   const eventKeys = useMemo(
     () => Array.from(eventMap.keys()).sort().join("|"),
     [eventMap]
   );
+
+  const ticketsByProject = useMemo(() => {
+    const map = new Map<string, Ticket[]>();
+    for (const t of tickets) {
+      const list = map.get(t.project_id);
+      if (list) list.push(t);
+      else map.set(t.project_id, [t]);
+    }
+    return map;
+  }, [tickets]);
   const tz = getLocalTimeZone();
   const todayDate = today(tz);
 
@@ -76,7 +99,7 @@ export function EventCalendar({
 
   return (
     <div className="grid grid-cols-1 gap-6 xl:grid-cols-12">
-      <div className="theme-panel min-w-0 border p-4 xl:col-span-5">
+      <div className="reveal-child theme-panel min-w-0 border p-4 xl:col-span-5 [--reveal-delay:100ms]">
         <Calendar
           aria-label="活动日历"
           className="w-full max-w-none bg-transparent shadow-none"
@@ -135,7 +158,7 @@ export function EventCalendar({
         </div>
       </div>
 
-      <div className="theme-panel min-w-0 border xl:col-span-7">
+      <div className="reveal-child theme-panel min-w-0 border xl:col-span-7 [--reveal-delay:180ms]">
         <div className="theme-hairline flex items-end justify-between gap-3 border-b px-4 py-3 sm:px-5">
           <div>
             <p className="theme-ink-faint text-[10px] tracking-[0.22em]">
@@ -160,10 +183,8 @@ export function EventCalendar({
               该日暂无监控活动
             </p>
           ) : (
-            dayProjects.map((project) => {
-              const projectTickets = tickets.filter(
-                (t) => t.project_id === project.id
-              );
+            dayProjects.map((project, index) => {
+              const projectTickets = ticketsByProject.get(project.id) ?? [];
               const available = projectTickets.filter((t) =>
                 isAvailableStatus(t.status)
               ).length;
@@ -174,7 +195,8 @@ export function EventCalendar({
                   type="button"
                   data-cursor="pointer"
                   onClick={() => openProject(project)}
-                  className="theme-hairline flex w-full items-start gap-3 border-b px-4 py-3.5 text-left transition-colors last:border-b-0 hover:bg-accent/10 sm:px-5"
+                  style={{ animationDelay: `${Math.min(index, 8) * 45}ms` }}
+                  className="stagger-item theme-hairline flex w-full items-start gap-3 border-b px-4 py-3.5 text-left transition-colors last:border-b-0 hover:bg-accent/10 sm:px-5"
                 >
                   <div className="min-w-0 flex-1">
                     <div className="flex min-w-0 items-center gap-2">
@@ -213,8 +235,13 @@ export function EventCalendar({
       </div>
     </div>
   );
-}
+});
 
 export function useEventDayCount(projects: Project[]): number {
-  return useMemo(() => countEventDays(buildEventDateMap(projects)), [projects]);
+  const sig = useMemo(() => calendarSignature(projects), [projects]);
+  return useMemo(
+    () => countEventDays(buildEventDateMap(projects)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [sig]
+  );
 }

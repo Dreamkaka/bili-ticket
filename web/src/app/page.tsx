@@ -3,8 +3,9 @@
 import { useCallback, useState } from "react";
 import { useTelemetry } from "@/hooks/useTelemetry";
 import { useProjectCarousel } from "@/hooks/useProjectCarousel";
-import { useWsUpdateProgress } from "@/hooks/useWsUpdateProgress";
 import { useCommandPalette } from "@/hooks/useCommandPalette";
+import { useDiffToasts } from "@/hooks/useDiffToasts";
+import { useNotifications } from "@/hooks/useNotifications";
 import { BootSequence } from "@/components/boot/BootSequence";
 import type { BootPhase } from "@/hooks/useBootProgress";
 import { PageBackground } from "@/components/layout/PageBackground";
@@ -13,6 +14,7 @@ import { DashboardFooter } from "@/components/layout/DashboardFooter";
 import { DisconnectOverlay } from "@/components/layout/DisconnectOverlay";
 import { WsProgressBar } from "@/components/layout/WsProgressBar";
 import { SectionTitle } from "@/components/layout/SectionTitle";
+import { RevealSection } from "@/components/layout/RevealSection";
 import { HeroStage } from "@/components/hero/HeroStage";
 import { KpiStrip } from "@/components/metrics/KpiStrip";
 import { ProjectGrid } from "@/components/projects/ProjectGrid";
@@ -20,6 +22,7 @@ import { EventStream } from "@/components/events/EventStream";
 import { StockChart } from "@/components/events/StockChart";
 import { NodePanel } from "@/components/nodes/NodePanel";
 import { CommandPalette } from "@/components/command/CommandPalette";
+import { NotificationCenter } from "@/components/notifications/NotificationCenter";
 import {
   EventCalendar,
   useEventDayCount,
@@ -41,7 +44,6 @@ export default function Home() {
 
   const [bootPhase, setBootPhase] = useState<BootPhase>("loading");
   const isBooting = bootPhase !== "done";
-  // 仅在青色过场开始后挂载主界面，避免加载期穿帮
   const showMain =
     bootPhase === "wipe-in" || bootPhase === "wipe-out" || bootPhase === "done";
 
@@ -51,17 +53,12 @@ export default function Home() {
     focusProject,
     focusTickets,
     focusIndex,
-    progress,
     userLocked,
     selectProject,
     selectFromDiff,
     resumeAutoplay,
+    registerProgressEl,
   } = useProjectCarousel(showMain ? projects : [], showMain ? tickets : []);
-
-  const wsProgress = useWsUpdateProgress(
-    showMain ? lastUpdate : null,
-    showMain ? connectionStatus : "connecting"
-  );
 
   const bootDone = bootPhase === "done";
   const {
@@ -69,6 +66,19 @@ export default function Home() {
     setOpen: setCommandOpen,
     openPalette,
   } = useCommandPalette({ enabled: bootDone });
+
+  const {
+    open: notifyOpen,
+    setOpen: setNotifyOpen,
+    openPanel: openNotifications,
+    unreadCount,
+  } = useNotifications(diffs, bootDone);
+
+  useDiffToasts({
+    diffs,
+    enabled: bootDone,
+    onSelectDiff: selectFromDiff,
+  });
 
   const eventDayCount = useEventDayCount(showMain ? projects : []);
 
@@ -79,7 +89,6 @@ export default function Home() {
 
   return (
     <div className="relative min-h-[100dvh] overflow-x-hidden bg-[var(--background)]">
-      {/* 首屏只出加载层；数据在后台由 useTelemetry 拉取 */}
       {isBooting && (
         <BootSequence
           onDone={finishBoot}
@@ -92,7 +101,10 @@ export default function Home() {
       {showMain && (
         <>
           <PageBackground project={focusProject} />
-          <WsProgressBar progress={wsProgress} connectionStatus={connectionStatus} />
+          <WsProgressBar
+            lastUpdate={lastUpdate}
+            connectionStatus={connectionStatus}
+          />
 
           <div className="relative z-10 min-h-[100dvh]">
             <SiteNav
@@ -100,46 +112,56 @@ export default function Home() {
               systemHealthy={systemHealthy}
               lastUpdate={lastUpdate}
               onOpenCommand={bootDone ? openPalette : undefined}
+              onOpenNotifications={bootDone ? openNotifications : undefined}
+              unreadCount={unreadCount}
             />
 
             {bootDone && (
-              <CommandPalette
-                open={commandOpen}
-                onOpenChange={setCommandOpen}
-                projects={projects}
-                connectionStatus={connectionStatus}
-                lastUpdate={lastUpdate}
-                systemHealthy={systemHealthy}
-                onSelectProject={selectProject}
-              />
+              <>
+                <CommandPalette
+                  open={commandOpen}
+                  onOpenChange={setCommandOpen}
+                  projects={projects}
+                  connectionStatus={connectionStatus}
+                  lastUpdate={lastUpdate}
+                  systemHealthy={systemHealthy}
+                  onSelectProject={selectProject}
+                  onOpenNotifications={openNotifications}
+                />
+                <NotificationCenter
+                  open={notifyOpen}
+                  onOpenChange={setNotifyOpen}
+                  diffs={diffs}
+                  onSelectDiff={selectFromDiff}
+                />
+              </>
             )}
 
             <DisconnectOverlay visible={connectionStatus === "disconnected"} />
 
             <HeroStage
               projects={projects}
-              tickets={tickets}
-              diffs={diffs}
               focusProject={focusProject}
               focusTickets={focusTickets}
               focusIndex={focusIndex}
-              progress={progress}
               userLocked={userLocked}
-              onSelectDiff={selectFromDiff}
               onResumeAutoplay={resumeAutoplay}
+              registerProgressEl={registerProgressEl}
             />
 
             <div className="relative w-full space-y-10 px-4 py-10 sm:px-6 sm:py-12 lg:px-8 lg:space-y-14">
-              <section className="section-block animate-fade-in-up">
+              <RevealSection>
                 <KpiStrip
                   projects={projects.length}
                   available={availableTickets}
                   online={onlineNodes}
                   events={diffs.length}
                 />
-              </section>
+              </RevealSection>
 
-              <section id="calendar" className="section-block animate-fade-in-up anim-delay-1">
+              <RevealSection
+                id="calendar"
+              >
                 <SectionTitle
                   en="CALENDAR"
                   title="活动日历"
@@ -151,9 +173,11 @@ export default function Home() {
                   tickets={tickets}
                   onSelectProject={selectProject}
                 />
-              </section>
+              </RevealSection>
 
-              <section id="projects" className="section-block animate-fade-in-up anim-delay-2">
+              <RevealSection
+                id="projects"
+              >
                 <SectionTitle
                   en="PROJECTS"
                   title="监控项目"
@@ -172,19 +196,23 @@ export default function Home() {
                     <EventStream diffs={diffs} onSelectDiff={selectFromDiff} />
                   </div>
                 </div>
-              </section>
+              </RevealSection>
 
-              <section id="trends" className="section-block animate-fade-in-up anim-delay-3">
+              <RevealSection
+                id="trends"
+              >
                 <SectionTitle
                   en="TRENDS"
                   title="库存趋势"
                   description="基于状态变动推送的余量采样"
                   meta={`${stockHistory.length} PTS`}
                 />
-                <StockChart data={stockHistory} mounted />
-              </section>
+                <StockChart data={stockHistory} />
+              </RevealSection>
 
-              <section id="nodes" className="section-block animate-fade-in-up anim-delay-3">
+              <RevealSection
+                id="nodes"
+              >
                 <SectionTitle
                   en="NODES"
                   title="采集节点"
@@ -192,7 +220,7 @@ export default function Home() {
                   meta={`ONLINE // ${onlineNodes}`}
                 />
                 <NodePanel nodes={nodes} />
-              </section>
+              </RevealSection>
             </div>
 
             <DashboardFooter lastUpdate={lastUpdate} />

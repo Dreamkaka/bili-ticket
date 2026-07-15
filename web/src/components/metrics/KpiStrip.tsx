@@ -1,5 +1,7 @@
 "use client";
 
+import { memo } from "react";
+
 const ITEMS = [
   { key: "projects", en: "01", label: "监控项目" },
   { key: "available", en: "02", label: "可售票档" },
@@ -7,7 +9,7 @@ const ITEMS = [
   { key: "events", en: "04", label: "最近变动" },
 ] as const;
 
-export function KpiStrip({
+export const KpiStrip = memo(function KpiStrip({
   projects,
   available,
   online,
@@ -41,4 +43,4 @@ export function KpiStrip({
       ))}
     </div>
   );
-}
+});

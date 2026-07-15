@@ -34,9 +34,9 @@
   --panel: oklch(1 0.005 250 / 0.88);
   --panel-strong: oklch(1 0.005 250 / 0.95);
   --nav-bg: oklch(0.98 0.008 250 / 0.9);
-  --scrim: oklch(0.97 0.01 250 / 0.58);
-  --scrim-strong: oklch(0.96 0.01 250 / 0.68);
-  --scrim-base: oklch(0.98 0.008 250 / 0.55);
+  --scrim: oklch(0.97 0.01 250 / 0.72);
+  --scrim-strong: oklch(0.96 0.01 250 / 0.82);
+  --scrim-base: oklch(0.98 0.008 250 / 0.68);
   --hairline: oklch(0.2 0.02 250 / 0.12);
   --ink: oklch(0.16 0.02 250);
   --ink-soft: oklch(0.42 0.02 250);
@@ -73,9 +73,9 @@
   --panel: oklch(0.08 0.015 250 / 0.72);
   --panel-strong: oklch(0.08 0.015 250 / 0.85);
   --nav-bg: oklch(0.06 0.01 250 / 0.82);
-  --scrim: oklch(0.05 0.01 250 / 0.58);
-  --scrim-strong: oklch(0.04 0.01 250 / 0.68);
-  --scrim-base: oklch(0.04 0.01 250 / 0.55);
+  --scrim: oklch(0.05 0.01 250 / 0.72);
+  --scrim-strong: oklch(0.04 0.01 250 / 0.82);
+  --scrim-base: oklch(0.04 0.01 250 / 0.68);
   --hairline: oklch(1 0 0 / 0.1);
   --ink: oklch(0.98 0.005 250);
   --ink-soft: oklch(0.78 0.01 250);
@@ -292,28 +292,35 @@ html.custom-cursor * {
   overflow: hidden;
 }
 
-.bg-layer img,
-.bg-layer .bg-fallback {
+.bg-media {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
   object-position: center;
-  will-change: opacity, transform;
-}
-
-.bg-layer--enter img,
-.bg-layer--enter .bg-fallback {
-  animation:
-    bgCrossfadeIn 0.9s var(--ease-out-soft) both,
-    bgKenBurns 12s ease-out both;
-}
-
-.bg-layer--idle img,
-.bg-layer--idle .bg-fallback {
-  opacity: 1;
+  transform-origin: center center;
+  will-change: transform;
   animation: bgKenBurns 12s ease-out both;
+}
+
+.bg-layer--enter {
+  z-index: 1;
+  will-change: opacity;
+  animation: bgCrossfadeIn 0.9s var(--ease-out-soft) both;
+}
+
+.bg-layer--idle {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bg-layer--enter,
+  .bg-media {
+    animation: none;
+    opacity: 1;
+    transform: scale(1.04);
+  }
 }
 
 .stagger-item {
@@ -338,6 +345,46 @@ html.custom-cursor * {
 
 .section-block {
   scroll-margin-top: 5rem;
+}
+
+.reveal-section {
+  opacity: 0;
+  transform: translateY(24px);
+  filter: blur(3px);
+  transition:
+    opacity 0.75s var(--ease-out-expo),
+    transform 0.75s var(--ease-out-expo),
+    filter 0.75s var(--ease-out-soft);
+}
+
+.reveal-section.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+  filter: blur(0);
+}
+
+.reveal-section .reveal-child {
+  opacity: 0;
+  transform: translateY(16px) scale(0.985);
+  transition:
+    opacity 0.55s var(--ease-out-expo),
+    transform 0.55s var(--ease-out-expo);
+  transition-delay: var(--reveal-delay, 100ms);
+}
+
+.reveal-section.is-visible .reveal-child {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal-section,
+  .reveal-section .reveal-child {
+    opacity: 1;
+    transform: none;
+    filter: none;
+    transition: none;
+  }
 }
 
 .ui-panel {

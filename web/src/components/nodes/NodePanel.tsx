@@ -1,5 +1,6 @@
 "use client";
 
+import { memo, type CSSProperties } from "react";
 import { Card, Chip } from "@heroui/react";
 import type { Node } from "@/lib/types";
 import { formatClock, isNodeAlive } from "@/lib/status";
@@ -16,7 +17,7 @@ function nodeState(node: Node) {
   return { label: "正常", color: "accent" as const };
 }
 
-export function NodePanel({ nodes }: { nodes: Node[] }) {
+export const NodePanel = memo(function NodePanel({ nodes }: { nodes: Node[] }) {
   if (nodes.length === 0) {
     return (
       <div className="theme-panel theme-ink-faint flex min-h-28 items-center justify-center border text-sm">
@@ -27,12 +28,13 @@ export function NodePanel({ nodes }: { nodes: Node[] }) {
 
   return (
     <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-      {nodes.map((node) => {
+      {nodes.map((node, index) => {
         const state = nodeState(node);
         return (
           <Card
             key={node.name}
-            className="ui-panel theme-panel rounded-none border border-[var(--hairline)] shadow-none"
+            style={{ "--reveal-delay": `${Math.min(index, 8) * 65 + 100}ms` } as CSSProperties}
+            className="reveal-child ui-panel theme-panel rounded-none border border-[var(--hairline)] shadow-none"
           >
             <Card.Header className="flex items-start justify-between gap-2 p-5 pb-3">
               <div>
@@ -71,4 +73,4 @@ export function NodePanel({ nodes }: { nodes: Node[] }) {
       })}
     </div>
   );
-}
+});

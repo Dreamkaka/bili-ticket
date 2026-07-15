@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { formatApiUrl, getWsUrl } from "@/lib/api";
 import type {
   ConnectionStatus,
@@ -10,13 +10,22 @@ import type {
   StockDataPoint,
   Ticket,
 } from "@/lib/types";
+import {
+  nodeEqual,
+  projectEqual,
+  stabilizeByKey,
+  ticketEqual,
+} from "@/lib/stable";
 
-const DIFF_LIMIT = 100;
+const DIFF_LIMIT = 1000;
 
 function enrichDiffs(incoming: Diff[], currentProjects: Project[]): Diff[] {
+  if (incoming.length === 0) return incoming;
+  const byId = new Map(currentProjects.map((p) => [p.id, p]));
+
   return incoming.map((item) => {
     const match =
-      currentProjects.find((p) => p.id === item.ticket_id) ||
+      byId.get(item.ticket_id) ||
       currentProjects.find(
         (p) =>
           p.name &&
@@ -249,11 +258,32 @@ export function useTelemetry() {
             const payload = data || {};
             const nextProjects: Project[] = payload.projects || [];
             if (nextProjects.length) {
-              setProjects(nextProjects);
-              projectsRef.current = nextProjects;
+              setProjects((prev) => {
+                const stable = stabilizeByKey(
+                  prev,
+                  nextProjects,
+                  (p) => p.id,
+                  projectEqual
+                );
+                projectsRef.current = stable;
+                return stable;
+              });
             }
-            if (payload.nodes) setNodes(payload.nodes);
-            if (payload.tickets) setTickets(payload.tickets);
+            if (payload.nodes) {
+              setNodes((prev) =>
+                stabilizeByKey(prev, payload.nodes as Node[], (n) => n.name, nodeEqual)
+              );
+            }
+            if (payload.tickets) {
+              setTickets((prev) =>
+                stabilizeByKey(
+                  prev,
+                  payload.tickets as Ticket[],
+                  (t) => t.key,
+                  ticketEqual
+                )
+              );
+            }
 
             const snapDiffs = unpackDiffs(payload);
             if (snapDiffs.length > 0) {
@@ -271,10 +301,49 @@ export function useTelemetry() {
             }
             setLastUpdate(Date.now());
           } else if (type === "status_update") {
-            setProjects(data.projects || []);
-            setNodes(data.nodes || []);
-            if (data.tickets) setTickets(data.tickets);
+            let changed = false;
+            const nextProjects = (data.projects || []) as Project[];
+            const nextNodes = (data.nodes || []) as Node[];
+            const nextTickets = data.tickets
+              ? (data.tickets as Ticket[])
+              : null;
+
+            setProjects((prev) => {
+              const stable = stabilizeByKey(
+                prev,
+                nextProjects,
+                (p) => p.id,
+                projectEqual
+              );
+              if (stable !== prev) changed = true;
+              projectsRef.current = stable;
+              return stable;
+            });
+            setNodes((prev) => {
+              const stable = stabilizeByKey(
+                prev,
+                nextNodes,
+                (n) => n.name,
+                nodeEqual
+              );
+              if (stable !== prev) changed = true;
+              return stable;
+            });
+            if (nextTickets) {
+              setTickets((prev) => {
+                const stable = stabilizeByKey(
+                  prev,
+                  nextTickets,
+                  (t) => t.key,
+                  ticketEqual
+                );
+                if (stable !== prev) changed = true;
+                return stable;
+              });
+            }
+            // 心跳始终刷新 lastUpdate，供底部进度条；数据引用已稳定时子树可 memo 跳过
             setLastUpdate(Date.now());
+            void changed;
           } else if (type === "diff") {
             const incomingDiffs: Diff[] = Array.isArray(data) ? data : [data];
 
@@ -283,20 +352,23 @@ export function useTelemetry() {
               return mergeDiffs(prev, enriched);
             });
 
-            setTickets((prevTickets) =>
-              prevTickets.map((t) => {
+            setTickets((prevTickets) => {
+              let changed = false;
+              const next = prevTickets.map((t) => {
                 const match = incomingDiffs.find(
                   (d) => d.ticket_id === t.project_id && d.ticket_name === t.name
                 );
                 if (!match) return t;
+                changed = true;
                 return {
                   ...t,
                   status: match.new_status,
                   less_vt: match.less_vt,
                   last_updated: match.ts * 1000,
                 };
-              })
-            );
+              });
+              return changed ? next : prevTickets;
+            });
 
             setStockHistory((prev) => {
               const validNewPoints = toStockPoints(incomingDiffs);
@@ -345,22 +417,30 @@ export function useTelemetry() {
     };
   }, []);
 
-  const availableTickets = tickets.filter((t) => {
-    const s = t.status;
-    return s === "可售" || s.includes("有票") || s.includes("预售中");
-  }).length;
+  const availableTickets = useMemo(
+    () =>
+      tickets.filter((t) => {
+        const s = t.status;
+        return s === "可售" || s.includes("有票") || s.includes("预售中");
+      }).length,
+    [tickets]
+  );
 
-  const onlineNodes = nodes.filter(
-    (n) => Date.now() - n.last_heartbeat < 15000
-  ).length;
+  const onlineNodes = useMemo(
+    () => nodes.filter((n) => Date.now() - n.last_heartbeat < 15000).length,
+    [nodes, lastUpdate]
+  );
 
-  const systemHealthy =
-    connectionStatus === "connected" &&
-    (nodes.length === 0 ||
-      nodes.every(
-        (n) =>
-          n.status === "healthy" || Date.now() - n.last_heartbeat < 15000
-      ));
+  const systemHealthy = useMemo(
+    () =>
+      connectionStatus === "connected" &&
+      (nodes.length === 0 ||
+        nodes.every(
+          (n) =>
+            n.status === "healthy" || Date.now() - n.last_heartbeat < 15000
+        )),
+    [connectionStatus, nodes, lastUpdate]
+  );
 
   return {
     connectionStatus,
