@@ -216,7 +216,7 @@ export default function Home() {
                 <SectionTitle
                   en="NODES"
                   title="采集节点"
-                  description="心跳与任务分配"
+                  description="主探针分片任务 · 辅助监测全量冗余"
                   meta={`ONLINE // ${onlineNodes}`}
                 />
                 <NodePanel nodes={nodes} />

@@ -44,3 +44,7 @@ probe/ticket-probe
 # Go Workspace
 go.work
 go.work.sum
+
+# Cloudflare Worker (worker)
+.wrangler/
+.dev.vars

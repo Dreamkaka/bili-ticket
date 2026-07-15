@@ -138,6 +138,18 @@ try {
   console.error("Database self-check / migration failed:", e);
 }
 
+try {
+  const nodeInfo = db.prepare("PRAGMA table_info(nodes)").all() as {
+    name: string;
+  }[];
+  const nodeColumns = nodeInfo.map((c) => c.name);
+  if (!nodeColumns.includes("role")) {
+    db.exec("ALTER TABLE nodes ADD COLUMN role TEXT DEFAULT 'primary';");
+  }
+} catch (e) {
+  console.error("Database nodes.role migration failed:", e);
+}
+
 const configPath =
   process.env.CONFIG_PATH || path.join(process.cwd(), "config.json");
 let initialPollInterval = 5000;
@@ -395,6 +407,138 @@ function triggerReassignment() {
   }
 }
 
+type DiffEventLike = {
+  ticket_id?: unknown;
+  name?: unknown;
+  ticket_name?: unknown;
+  old_status?: unknown;
+  new_status?: unknown;
+  ts?: unknown;
+  less_vt?: unknown;
+  sub_ticket_id?: unknown;
+  key?: unknown;
+  price?: unknown;
+};
+
+/** 写入 diffs/tickets 并向 frontend 广播；WS 与 HTTP 探针共用 */
+function ingestDiffs(nodeName: string, data: DiffEventLike[]) {
+  console.log(
+    `Ingesting ${data.length} diff(s) from node: ${nodeName}`,
+  );
+
+  const insertDiff = db.prepare(`
+    INSERT INTO diffs (ticket_id, ticket_name, old_status, new_status, ts, less_vt)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `);
+
+  const upsertTicketFromDiff = db.prepare(`
+    INSERT INTO tickets (project_id, sub_ticket_id, key, name, status, price, less_vt, last_updated)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(key) DO UPDATE SET
+      status = excluded.status,
+      less_vt = excluded.less_vt,
+      last_updated = excluded.last_updated
+  `);
+
+  const insertMany = dbTransaction((diffs: DiffEventLike[]) => {
+    for (const diff of diffs) {
+      insertDiff.run(
+        String(diff.ticket_id),
+        String(diff.name || diff.ticket_name || ""),
+        String(diff.old_status),
+        String(diff.new_status),
+        Number(diff.ts),
+        Number(diff.less_vt ?? -1),
+      );
+
+      upsertTicketFromDiff.run(
+        String(diff.ticket_id),
+        Number(diff.sub_ticket_id),
+        String(diff.key),
+        String(diff.name || diff.ticket_name || ""),
+        String(diff.new_status),
+        Number(diff.price || 0),
+        Number(diff.less_vt ?? -1),
+        Number(diff.ts),
+      );
+    }
+  });
+
+  insertMany(data);
+
+  for (const client of activeFrontendSockets) {
+    try {
+      client.send(
+        JSON.stringify({
+          type: "diff",
+          data,
+        }),
+      );
+    } catch (err) {
+      console.error("Failed to broadcast diff to frontend client:", err);
+    }
+  }
+}
+
+function upsertProbeNode(
+  nodeName: string,
+  role: string,
+  status: string,
+  httpCode: number,
+  message: string,
+) {
+  const now = Date.now();
+  db.prepare(
+    `
+    INSERT INTO nodes (name, last_heartbeat, reassign_pending, status, last_http_code, last_error_message, role)
+    VALUES (?, ?, 0, ?, ?, ?, ?)
+    ON CONFLICT(name) DO UPDATE SET
+      last_heartbeat = excluded.last_heartbeat,
+      status = excluded.status,
+      last_http_code = excluded.last_http_code,
+      last_error_message = excluded.last_error_message,
+      role = excluded.role
+  `,
+  ).run(nodeName, now, status, httpCode, message, role);
+}
+
+function getMonitorTargets() {
+  const cores = db
+    .prepare("SELECT id FROM projects WHERE type = 'core'")
+    .all() as { id: string }[];
+  const shards = db
+    .prepare("SELECT id FROM projects WHERE type = 'shard'")
+    .all() as { id: string }[];
+  const core_ids = cores.map((c) => c.id);
+  const shard_ids = shards.map((s) => s.id);
+  return {
+    core_ids,
+    shard_ids,
+    all_ids: [...core_ids, ...shard_ids],
+    poll_interval_ms: initialPollInterval,
+  };
+}
+
+/** 前端 snapshot / status_update /api/nodes 共用，含 role 与分配任务数 */
+function listNodesForFrontend() {
+  return db
+    .prepare(
+      `
+      SELECT
+        n.name,
+        n.last_heartbeat,
+        n.reassign_pending,
+        n.status,
+        n.last_http_code,
+        n.last_error_message,
+        COALESCE(n.role, 'primary') AS role,
+        (SELECT COUNT(*) FROM projects p WHERE p.assigned_node = n.name) AS assigned_project_count
+      FROM nodes n
+    `,
+    )
+    .all();
+}
+
 const app = new Elysia({ adapter: node() })
   .use(openapi())
   // 允许 web(如 :4000) 直连 gateway(:3000) 时的跨域；同源代理场景也无害
@@ -457,15 +601,7 @@ const app = new Elysia({ adapter: node() })
           activeSockets.set(nodeName, ws);
           socketToNodeMap.set(ws.id, nodeName);
 
-          const now = Date.now();
-          db.prepare(
-            `
-            INSERT INTO nodes (name, last_heartbeat, reassign_pending, status, last_http_code, last_error_message)
-            VALUES (?, ?, 0, 'healthy', 200, '')
-            ON CONFLICT(name)
-            DO UPDATE SET last_heartbeat = ?, status = 'healthy', last_http_code = 200, last_error_message = ''
-          `,
-          ).run(nodeName, now, now);
+          upsertProbeNode(nodeName, "primary", "healthy", 200, "");
 
           triggerReassignment();
 
@@ -528,7 +664,6 @@ const app = new Elysia({ adapter: node() })
         }
 
         case "diff": {
-          // 使用 ws.id 获取节点名称
           const nodeName = socketToNodeMap.get(ws.id);
           if (!nodeName) {
             console.error(
@@ -537,74 +672,13 @@ const app = new Elysia({ adapter: node() })
             return;
           }
 
-          console.log(
-            `Received diff event from node: ${nodeName}, data size: ${Array.isArray(data) ? data.length : 0}`,
-          );
           if (!Array.isArray(data)) {
             console.error("Diff payload data is not an array");
             return;
           }
 
-          // 1. 准备向变动日志表写入流水
-          const insertDiff = db.prepare(`
-            INSERT INTO diffs (ticket_id, ticket_name, old_status, new_status, ts, less_vt)
-            VALUES (?, ?, ?, ?, ?, ?)
-          `);
-
-          // 2. 准备向票种状态表写入/更新最新状态（UPSERT 机制）
-          const upsertTicketFromDiff = db.prepare(`
-            INSERT INTO tickets (project_id, sub_ticket_id, key, name, status, price, less_vt, last_updated)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(key) DO UPDATE SET
-              status = excluded.status,
-              less_vt = excluded.less_vt,
-              last_updated = excluded.last_updated
-          `);
-
-          const insertMany = dbTransaction((diffs: any[]) => {
-            for (const diff of diffs) {
-              // 写入变动历史
-              insertDiff.run(
-                String(diff.ticket_id),
-                String(diff.name || diff.ticket_name || ""),
-                String(diff.old_status),
-                String(diff.new_status),
-                Number(diff.ts),
-                Number(diff.less_vt ?? -1),
-              );
-
-              // 更新该票种的最新状态和余票
-              upsertTicketFromDiff.run(
-                String(diff.ticket_id),
-                Number(diff.sub_ticket_id),
-                String(diff.key),
-                String(diff.name || diff.ticket_name || ""),
-                String(diff.new_status),
-                Number(diff.price || 0),
-                Number(diff.less_vt ?? -1),
-                Number(diff.ts),
-              );
-            }
-          });
-
           try {
-            insertMany(data);
-            for (const client of activeFrontendSockets) {
-              try {
-                // 广播实时 diff 时，显式转为 JSON 字符串发送
-                client.send(
-                  JSON.stringify({
-                    type: "diff",
-                    data: data,
-                  }),
-                );
-              } catch (err) {
-                console.error(
-                  "Failed to broadcast diff to frontend client:",
-                  err,
-                );
-              }
-            }
+            ingestDiffs(nodeName, data);
           } catch (err) {
             console.error(
               "Failed to insert diffs and tickets into database:",
@@ -650,11 +724,7 @@ const app = new Elysia({ adapter: node() })
             "SELECT id, type, assigned_node, name, venue_name, cover, project_label FROM projects",
           )
           .all();
-        const nodes = db
-          .prepare(
-            "SELECT name, status, last_http_code, last_error_message, last_heartbeat FROM nodes",
-          )
-          .all();
+        const nodes = listNodesForFrontend();
         const tickets = db
           .prepare(
             "SELECT project_id, sub_ticket_id, key, name, status, price, less_vt, last_updated FROM tickets WHERE status != 'removed'",
@@ -691,6 +761,79 @@ const app = new Elysia({ adapter: node() })
       activeFrontendSockets.delete(ws);
     },
   })
+  .get(
+    "/api/probe/targets",
+    ({ headers, set }) => {
+      try {
+        assertProbeAuthorized(headers as Record<string, string | undefined>);
+      } catch {
+        set.status = 401;
+        return { error: "Unauthorized" };
+      }
+      try {
+        return getMonitorTargets();
+      } catch (err: any) {
+        set.status = 500;
+        return { error: err.message || "Database error" };
+      }
+    },
+  )
+  .post(
+    "/api/probe/report",
+    ({ headers, body, set }) => {
+      try {
+        assertProbeAuthorized(headers as Record<string, string | undefined>);
+      } catch {
+        set.status = 401;
+        return { error: "Unauthorized" };
+      }
+
+      const nodeName = String(body?.node_name || "").trim();
+      if (!nodeName) {
+        set.status = 400;
+        return { error: "node_name is required" };
+      }
+
+      const role =
+        String(body?.role || "monitor").trim() === "primary"
+          ? "primary"
+          : "monitor";
+      const statusPayload = body?.status || {};
+      const status = String(statusPayload.status || "healthy");
+      const httpCode = Number(statusPayload.http_code ?? 200);
+      const message = String(statusPayload.message || "");
+
+      try {
+        // monitor 节点不进入 activeSockets，不触发 reassignment
+        upsertProbeNode(nodeName, role, status, httpCode, message);
+
+        const diffs = Array.isArray(body?.diffs) ? body.diffs : [];
+        if (diffs.length > 0) {
+          ingestDiffs(nodeName, diffs);
+        }
+
+        return { ok: true, ingested: diffs.length };
+      } catch (err: any) {
+        console.error("Failed to handle /api/probe/report:", err);
+        set.status = 500;
+        return { error: err.message || "Database error" };
+      }
+    },
+    {
+      body: t.Object({
+        node_name: t.String(),
+        role: t.Optional(t.String()),
+        status: t.Optional(
+          t.Object({
+            status: t.Optional(t.String()),
+            http_code: t.Optional(t.Number()),
+            message: t.Optional(t.String()),
+          }),
+        ),
+        diffs: t.Optional(t.Array(t.Any())),
+      }),
+    },
+  )
   // HTTP 版本的初始状态快照获取接口
   .get(
     "/api/snapshot",
@@ -708,11 +851,7 @@ const app = new Elysia({ adapter: node() })
             "SELECT id, type, assigned_node, name, venue_name, cover, project_label FROM projects",
           )
           .all();
-        const nodes = db
-          .prepare(
-            "SELECT name, status, last_http_code, last_error_message, last_heartbeat FROM nodes",
-          )
-          .all();
+        const nodes = listNodesForFrontend();
         const tickets = db
           .prepare(
             "SELECT project_id, sub_ticket_id, key, name, status, price, less_vt, last_updated FROM tickets WHERE status != 'removed'",
@@ -743,19 +882,7 @@ const app = new Elysia({ adapter: node() })
   )
   .get("/api/nodes", () => {
     try {
-      const query = `
-        SELECT
-          n.name,
-          n.last_heartbeat,
-          n.reassign_pending,
-          n.status,
-          n.last_http_code,
-          n.last_error_message,
-          (SELECT COUNT(*) FROM projects p WHERE p.assigned_node = n.name) as assigned_project_count
-        FROM nodes n
-      `;
-      const nodes = db.prepare(query).all();
-      return nodes;
+      return listNodesForFrontend();
     } catch (err: any) {
       return { error: err.message || "Database error" };
     }
@@ -823,11 +950,7 @@ setInterval(() => {
         "SELECT id, type, assigned_node, name, venue_name, cover, project_label FROM projects",
       )
       .all();
-    const nodes = db
-      .prepare(
-        "SELECT name, status, last_http_code, last_error_message, last_heartbeat FROM nodes",
-      )
-      .all();
+    const nodes = listNodesForFrontend();
     const tickets = db
       .prepare(
         "SELECT project_id, sub_ticket_id, key, name, status, price, less_vt, last_updated FROM tickets WHERE status != 'removed'",

@@ -16,6 +16,7 @@ import {
   stabilizeByKey,
   ticketEqual,
 } from "@/lib/stable";
+import { isMonitorRole, isNodeAlive } from "@/lib/status";
 
 const DIFF_LIMIT = 1000;
 
@@ -426,21 +427,23 @@ export function useTelemetry() {
     [tickets]
   );
 
-  const onlineNodes = useMemo(
-    () => nodes.filter((n) => Date.now() - n.last_heartbeat < 15000).length,
-    [nodes, lastUpdate]
-  );
+  const onlineNodes = useMemo(() => {
+    const now = Date.now();
+    return nodes.filter((n) => isNodeAlive(n.last_heartbeat, now, n.role))
+      .length;
+  }, [nodes, lastUpdate]);
 
-  const systemHealthy = useMemo(
-    () =>
-      connectionStatus === "connected" &&
-      (nodes.length === 0 ||
-        nodes.every(
-          (n) =>
-            n.status === "healthy" || Date.now() - n.last_heartbeat < 15000
-        )),
-    [connectionStatus, nodes, lastUpdate]
-  );
+  // 全局健康只看主探针；monitor 离线/风控不拉垮系统指示
+  const systemHealthy = useMemo(() => {
+    if (connectionStatus !== "connected") return false;
+    const primaries = nodes.filter((n) => !isMonitorRole(n.role));
+    if (primaries.length === 0) return true;
+    const now = Date.now();
+    return primaries.every(
+      (n) =>
+        n.status === "healthy" || isNodeAlive(n.last_heartbeat, now, n.role),
+    );
+  }, [connectionStatus, nodes, lastUpdate]);
 
   return {
     connectionStatus,

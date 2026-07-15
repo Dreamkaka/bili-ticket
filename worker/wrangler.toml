@@ -1,0 +1,30 @@
+name = "ticket-worker-probe"
+main = "src/index.ts"
+compatibility_date = "2025-06-01"
+
+# 每分钟执行一次纯监测
+[triggers]
+crons = ["* * * * *"]
+
+[[kv_namespaces]]
+binding = "PROBE_STATE"
+id = "REPLACE_WITH_KV_NAMESPACE_ID"
+preview_id = "REPLACE_WITH_KV_PREVIEW_ID"
+
+[vars]
+NODE_NAME = "cf-worker-monitor"
+# 可选：冷启动种子，与 gateway/config.json 对齐，减少对 targets 的依赖
+# CORE_IDS = "1003349,1003397,1001279"
+# SHARD_IDS = "1002403,111639"
+TARGETS_TTL_SEC = "3600"
+# 每次 cron 都上报心跳（节点会立刻出现在 /api/nodes）；压力主要在 B 站与 targets 缓存
+HEARTBEAT_EVERY_N_RUNS = "1"
+MAX_CONCURRENCY = "3"
+PROBE_USER_AGENT = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 "
+
+# 本地 secrets：写 worker/.env 或 worker/.env.local，然后 npm run dev
+# （predev 会同步到 .dev.vars，Wrangler 只加载 .dev.vars）
+#
+# 生产 secrets:
+#   wrangler secret put GATEWAY_HTTP_URL
+#   wrangler secret put PROBE_TOKEN

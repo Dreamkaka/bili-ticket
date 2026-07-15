@@ -47,6 +47,7 @@ export function nodeEqual(
     last_error_message: string | null;
     last_heartbeat: number;
     assigned_project_count?: number;
+    role?: string;
   },
   b: typeof a
 ): boolean {
@@ -56,7 +57,8 @@ export function nodeEqual(
     a.last_http_code === b.last_http_code &&
     a.last_error_message === b.last_error_message &&
     a.last_heartbeat === b.last_heartbeat &&
-    a.assigned_project_count === b.assigned_project_count
+    a.assigned_project_count === b.assigned_project_count &&
+    (a.role || "primary") === (b.role || "primary")
   );
 }
 

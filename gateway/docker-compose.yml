@@ -1,0 +1,20 @@
+services:
+  gateway:
+    build: .
+    image: ghcr.io/dreamkaka/bili-ticket/ticket-gateway:latest
+    container_name: ticket-gateway
+    ports:
+      - "3000:3000"
+    environment:
+      PORT: "3000"
+      DATABASE_PATH: /data/gateway.db
+      CONFIG_PATH: /config/config.json
+      # 与 probe 一致；本地可留空（开发放行）
+      PROBE_TOKEN: ${PROBE_TOKEN:-}
+    volumes:
+      - gateway-data:/data
+      - ./config.json:/config/config.json:ro
+    restart: unless-stopped
+
+volumes:
+  gateway-data:

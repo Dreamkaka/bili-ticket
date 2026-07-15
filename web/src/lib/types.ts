@@ -9,6 +9,9 @@ export interface Project {
   project_label: string | null;
 }
 
+/** primary=Go 主探针；monitor=Worker 辅助监测 */
+export type NodeRole = "primary" | "monitor" | string;
+
 export interface Node {
   name: string;
   status: string;
@@ -16,6 +19,8 @@ export interface Node {
   last_error_message: string | null;
   last_heartbeat: number;
   assigned_project_count?: number;
+  /** 缺省视为 primary，兼容旧数据 */
+  role?: NodeRole;
 }
 
 export interface Ticket {

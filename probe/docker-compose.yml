@@ -1,0 +1,15 @@
+services:
+  probe:
+    build: .
+    image: ghcr.io/dreamkaka/bili-ticket/ticket-gateway
+    container_name: ticket-probe
+    environment:
+      NODE_NAME: ${NODE_NAME:-docker-probe}
+      # 默认连宿主机上的 gateway（Windows/Mac Docker Desktop）
+      # Linux 可改为 host 网络，或改成实际 gateway 地址
+      GATEWAY_WS_URL: ${GATEWAY_WS_URL:-ws://host.docker.internal:3000/ws/probe}
+      PROBE_TOKEN: ${PROBE_TOKEN:-}
+      PROBE_USER_AGENT: ${PROBE_USER_AGENT:-Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 }
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped

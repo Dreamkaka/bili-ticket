@@ -1,0 +1,16 @@
+{
+  "name": "ticket-worker-probe",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "sync-env": "node ./scripts/sync-dev-vars.mjs",
+    "dev": "node ./scripts/run-dev.mjs",
+    "deploy": "wrangler deploy",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250620.0",
+    "typescript": "^5.8.3",
+    "wrangler": "4.20.0"
+  }
+}

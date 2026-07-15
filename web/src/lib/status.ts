@@ -46,6 +46,23 @@ export function formatPrice(cents: number): string {
   return `¥${(cents / 100).toFixed(cents % 100 === 0 ? 0 : 2)}`;
 }
 
-export function isNodeAlive(lastHeartbeat: number, now = Date.now()): boolean {
-  return now - lastHeartbeat < 15000;
+/** Go 主探针秒级心跳 */
+export const PRIMARY_ALIVE_MS = 15_000;
+/** Worker 辅助探针约 1 分钟 Cron，放宽到 2 分钟 */
+export const MONITOR_ALIVE_MS = 120_000;
+
+export function isMonitorRole(role?: string | null): boolean {
+  return role === "monitor";
+}
+
+export function nodeAliveMs(role?: string | null): number {
+  return isMonitorRole(role) ? MONITOR_ALIVE_MS : PRIMARY_ALIVE_MS;
+}
+
+export function isNodeAlive(
+  lastHeartbeat: number,
+  now = Date.now(),
+  role?: string | null,
+): boolean {
+  return now - lastHeartbeat < nodeAliveMs(role);
 }
