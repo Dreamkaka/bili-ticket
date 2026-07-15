@@ -1,4 +1,5 @@
 const CONFIGURED_BASE = (process.env.NEXT_PUBLIC_BASE_URL || "").trim();
+const CONFIGURED_WS = (process.env.NEXT_PUBLIC_WS_URL || "").trim();
 
 /**
  * 浏览器侧优先走当前站点同源路径，由 Next rewrites 转发到 gateway，
@@ -49,11 +50,22 @@ export const formatApiUrl = (path: string): string => {
 };
 
 export const getWsUrl = (): string => {
-  const base = resolveBaseUrl();
+  // WebSocket 不能通过 Vercel rewrite 长连接代理，必须从浏览器直连 Gateway。
+  // 可用 NEXT_PUBLIC_WS_URL 显式指定完整地址；否则从 NEXT_PUBLIC_BASE_URL 推导。
+  const configured = CONFIGURED_WS || CONFIGURED_BASE;
+  if (configured) {
+    let normalized = configured;
+    if (!/^(https?|wss?):\/\//i.test(normalized)) {
+      normalized = `https://${normalized}`;
+    }
 
-  if (base) {
-    const normalized = normalizeBase(base);
-    return normalized.replace(/^http/, "ws") + "/ws/frontend";
+    normalized = normalized
+      .replace(/^https:/i, "wss:")
+      .replace(/^http:/i, "ws:")
+      .replace(/\/$/, "");
+
+    if (/\/ws\/frontend$/i.test(normalized)) return normalized;
+    return `${normalized}/ws/frontend`;
   }
 
   const host =

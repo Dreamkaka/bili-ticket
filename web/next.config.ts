@@ -10,16 +10,22 @@ const gateway =
 const nextConfig: NextConfig = {
   async rewrites() {
     const base = gateway.replace(/\/$/, "");
-    return [
+    const rewrites = [
       {
         source: "/api/:path*",
         destination: `${base}/api/:path*`,
       },
-      {
+    ];
+
+    // Vercel 不支持持久 WebSocket 代理；本地/自托管 Next 仍可保留同源 WS rewrite。
+    if (!process.env.VERCEL) {
+      rewrites.push({
         source: "/ws/:path*",
         destination: `${base}/ws/:path*`,
-      },
-    ];
+      });
+    }
+
+    return rewrites;
   },
 };
 
