@@ -42,6 +42,9 @@ async function getKv(): Promise<Deno.Kv> {
   return kvInstance;
 }
 
+// 引入内存二级缓存，避免频繁读取云端 KV 产生的 CPU 时间
+const memoryStatesCache = new Map<string, Record<string, TicketState>>();
+
 export async function runMonitor(): Promise<void> {
   const nodeName = Deno.env.get("NODE_NAME") || "deno-monitor";
   const userAgent = Deno.env.get("PROBE_USER_AGENT") || DEFAULT_UA;
@@ -103,10 +106,20 @@ export async function runMonitor(): Promise<void> {
         userAgent,
         sessdata,
       );
-      const prevEntry = await kv.get<Record<string, TicketState>>(
-        stateKey(projectId),
-      );
-      const prevRaw = prevEntry.value;
+
+      // 1. 优先从内存二级缓存获取上次状态
+      let prevRaw = memoryStatesCache.get(projectId);
+      if (!prevRaw) {
+        // 2. 内存缺失时才读取 KV 并写入内存缓存
+        const prevEntry = await kv.get<Record<string, TicketState>>(
+          stateKey(projectId),
+        );
+        prevRaw = prevEntry.value ?? undefined;
+        if (prevRaw) {
+          memoryStatesCache.set(projectId, prevRaw);
+        }
+      }
+
       const isFirst = !prevRaw;
       const oldStates = recordToStates(prevRaw);
 
@@ -116,11 +129,15 @@ export async function runMonitor(): Promise<void> {
 
         // 优化 KV 写入：仅当状态或余票数真的发生变化时才更新写入 KV，避免无意义的 KV 写额度消耗
         if (diffs.length > 0) {
-          await kv.set(stateKey(projectId), statesToRecord(newStates));
+          const record = statesToRecord(newStates);
+          memoryStatesCache.set(projectId, record);
+          await kv.set(stateKey(projectId), record);
         }
       } else {
         // 第一次冷启动拉取，必须写入初始状态
-        await kv.set(stateKey(projectId), statesToRecord(newStates));
+        const record = statesToRecord(newStates);
+        memoryStatesCache.set(projectId, record);
+        await kv.set(stateKey(projectId), record);
       }
     } catch (err) {
       console.error(`project ${projectId} failed:`, err);

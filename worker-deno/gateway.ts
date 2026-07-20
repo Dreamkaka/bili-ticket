@@ -39,6 +39,9 @@ function seedTargetsFromEnv(): TargetsCache | null {
   };
 }
 
+// 引入内存二级缓存，避免频繁读取云端 KV 产生 CPU 与读额度开销
+let memoryTargets: TargetsCache | null = null;
+
 export async function loadTargets(kv: Deno.Kv): Promise<{
   targets: TargetsCache | null;
   refreshed: boolean;
@@ -50,10 +53,20 @@ export async function loadTargets(kv: Deno.Kv): Promise<{
   );
   const now = Date.now();
 
+  // 1. 优先使用内存缓存
+  if (
+    memoryTargets?.all_ids?.length &&
+    now - memoryTargets.fetched_at < ttlSec * 1000
+  ) {
+    return { targets: { ...memoryTargets, stale: false }, refreshed: false };
+  }
+
+  // 2. 内存失效，从 KV 数据库尝试加载
   const cachedEntry = await kv.get<TargetsCache>([TARGETS_KEY]);
   const cached = cachedEntry.value;
 
   if (cached?.all_ids?.length && now - cached.fetched_at < ttlSec * 1000) {
+    memoryTargets = cached;
     return { targets: { ...cached, stale: false }, refreshed: false };
   }
 
@@ -102,7 +115,10 @@ export async function loadTargets(kv: Deno.Kv): Promise<{
       fetched_at: now,
       stale: false,
     };
+
+    // 写入 KV 数据库并同步内存缓存
     await kv.set([TARGETS_KEY], next);
+    memoryTargets = next;
     return { targets: next, refreshed: true };
   } catch (err) {
     const seed = cached || seedTargetsFromEnv();
