@@ -65,7 +65,7 @@ export async function runMonitor(): Promise<void> {
   }
 
   const kv = await getKv();
-  const run = await nextRunCounter(kv);
+  const run = nextRunCounter();
   const { targets, refreshed, error: targetsError } = await loadTargets(kv);
 
   if (!targets?.all_ids?.length) {
@@ -113,9 +113,15 @@ export async function runMonitor(): Promise<void> {
       if (!isFirst) {
         const diffs = diffStates(projectId, oldStates, newStates);
         allDiffs.push(...diffs);
-      }
 
-      await kv.set(stateKey(projectId), statesToRecord(newStates));
+        // 优化 KV 写入：仅当状态或余票数真的发生变化时才更新写入 KV，避免无意义的 KV 写额度消耗
+        if (diffs.length > 0) {
+          await kv.set(stateKey(projectId), statesToRecord(newStates));
+        }
+      } else {
+        // 第一次冷启动拉取，必须写入初始状态
+        await kv.set(stateKey(projectId), statesToRecord(newStates));
+      }
     } catch (err) {
       console.error(`project ${projectId} failed:`, err);
       if (isRiskControlError(err)) {

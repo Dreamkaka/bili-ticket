@@ -1,7 +1,6 @@
 import type { DiffEvent, NodeStatus, TargetsCache } from "./types.ts";
 
 const TARGETS_KEY = "targets:v1";
-const RUN_COUNTER_KEY = "meta:run_counter";
 
 function authHeaders(): HeadersInit {
   const token = Deno.env.get("PROBE_TOKEN");
@@ -143,12 +142,14 @@ export async function reportToGateway(
   }
 }
 
-export async function nextRunCounter(kv: Deno.Kv): Promise<number> {
-  const rawEntry = await kv.get<string>([RUN_COUNTER_KEY]);
-  const n = (Number(rawEntry.value || 0) || 0) + 1;
-  await kv.set([RUN_COUNTER_KEY], String(n));
-  return n;
+export function nextRunCounter(): number {
+  // 使用内存变量计次数。Deno Deploy Isolate 每次生命周期中会保留内存。
+  // 本地和生产重新部署、Isolate 被关停重置时计数器重归 1，重新走首次强制注册流程（完全符合预期，且不消耗任何 KV 写额度）。
+  globalRunCounter += 1;
+  return globalRunCounter;
 }
+
+let globalRunCounter = 0;
 
 export function stateKey(projectId: string): string[] {
   return ["state", projectId];
