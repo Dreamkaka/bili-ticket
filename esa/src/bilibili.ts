@@ -25,7 +25,6 @@ export class APIError extends Error {
 }
 
 type ApiResponse = {
-  // 新旧字段并存：历史 errno/msg，当前常见 code/message/success
   errno?: number;
   msg?: string;
   code?: number;
@@ -66,11 +65,9 @@ function isBizOk(parsed: ApiResponse): boolean {
   const code = bizCode(parsed);
   if (code !== undefined) return code === 0;
   if (typeof parsed.success === "boolean") return parsed.success;
-  // 无错误字段且带 data 时视为成功
   return Boolean(parsed.data);
 }
 
-/** 仅携带业务需要的头，避免转发入站/CF 相关头；平台层仍可能注入不可删字段 */
 function bilibiliHeaders(userAgent: string, sessdata?: string): Headers {
   const headers = new Headers();
   headers.set(
@@ -102,7 +99,6 @@ export async function fetchProjectStates(
     method: "GET",
     headers: bilibiliHeaders(userAgent, sessdata),
     redirect: "follow",
-    // 不传 cf 选项 / 不转发任何 Request，避免带上入站 CF 头
   });
 
   if (!resp.ok) {

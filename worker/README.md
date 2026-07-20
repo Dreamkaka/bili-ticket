@@ -1,5 +1,7 @@
 # ticket-worker-probe
 
+>由于b站已对cloudflare的ip进行了风控，因此此探针项目已弃用
+
 Cloudflare Worker **辅助监测探针**：分钟级 Cron 拉取 B 站票务状态，KV 做 lastState / 目标列表缓存，经 HTTP 向 Gateway 上报 `diff` 与心跳。
 
 与 Go 主探针并行：`role=monitor`，**不参与** WebSocket 分片 / reassignment。
@@ -22,6 +24,7 @@ Cron (* * * * *)
 | `PROBE_TOKEN` | secret / 本地 env | 与网关 `PROBE_TOKEN` 一致；网关未配置时可空 |
 | `NODE_NAME` | var | 默认 `cf-worker-monitor` |
 | `PROBE_USER_AGENT` | var | 请求 B 站 UA |
+| `SESSDATA` | secret / 本地 env | B 站登录 cookie `SESSDATA`，写入请求 Cookie 头降低风控；可空 |
 | `CORE_IDS` / `SHARD_IDS` | var | 可选冷启动种子（逗号分隔），减少对 targets 依赖 |
 | `TARGETS_TTL_SEC` | var | 目标列表缓存秒数，默认 `3600` |
 | `HEARTBEAT_EVERY_N_RUNS` | var | 无 diff 时每 N 次 Cron 报一次心跳，默认 `5` |
@@ -41,6 +44,7 @@ npx wrangler kv namespace create PROBE_STATE --preview
 # 编辑 wrangler.toml 中的 id / preview_id
 npx wrangler secret put GATEWAY_HTTP_URL
 npx wrangler secret put PROBE_TOKEN
+npx wrangler secret put SESSDATA   # 可选，B 站 cookie
 
 npm run deploy
 ```

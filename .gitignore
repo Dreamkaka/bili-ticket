@@ -45,6 +45,7 @@ probe/ticket-probe
 go.work
 go.work.sum
 
-# Cloudflare Worker (worker)
+# EdgeOne / worker local
 .wrangler/
 .dev.vars
+worker/.dev.vars

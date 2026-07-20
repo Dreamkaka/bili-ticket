@@ -1,60 +1,29 @@
-import {
-  fetchProjectStates,
-  HTTPError,
-  isRiskControlError,
-} from "./bilibili";
+import { fetchProjectStates, HTTPError, isRiskControlError } from "./bilibili";
 import { diffStates, recordToStates, statesToRecord } from "./diff";
-import {
-  loadTargets,
-  nextRunCounter,
-  reportToGateway,
-  stateKey,
-} from "./gateway";
+import { loadTargets, nextRunCounter, reportToGateway, stateKey } from "./gateway";
+import { AdaptiveKV } from "./kv";
 import type { DiffEvent, Env, NodeStatus, TicketState } from "./types";
 
-const DEFAULT_UA =
-  "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 ";
+const DEFAULT_UA = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 ";
 
-async function mapPool<T, R>(
-  items: T[],
-  concurrency: number,
-  fn: (item: T) => Promise<R>,
-): Promise<R[]> {
-  const results: R[] = new Array(items.length);
-  let idx = 0;
-
-  async function worker() {
-    while (idx < items.length) {
-      const i = idx++;
-      results[i] = await fn(items[i]!);
-    }
-  }
-
-  const n = Math.max(1, Math.min(concurrency, items.length || 1));
-  await Promise.all(Array.from({ length: n }, () => worker()));
-  return results;
-}
-
-async function runMonitor(env: Env): Promise<Response | void> {
-  const nodeName = env.NODE_NAME || "cf-worker-monitor";
+async function runMonitor(env: Env): Promise<void> {
+  const kv = new AdaptiveKV(env);
+  const nodeName = env.NODE_NAME || "aliyun-esa-monitor";
   const userAgent = env.PROBE_USER_AGENT || DEFAULT_UA;
   const sessdata = (env.SESSDATA || "").trim();
-  const concurrency = Math.max(1, Number(env.MAX_CONCURRENCY || 3) || 3);
-  const heartbeatEvery = Math.max(
-    1,
-    Number(env.HEARTBEAT_EVERY_N_RUNS || 5) || 5,
-  );
+  const heartbeatEvery = Math.max(1, Number(env.HEARTBEAT_EVERY_N_RUNS || 5) || 5);
+  // 阿里云 ESA 单次执行限制最多 4 次 fetch 子请求，分批轮询大小限制默认为 2
+  const maxProjectsPerRun = Math.max(1, Number(env.MAX_PROJECTS_PER_RUN || 2) || 2);
   const gatewayUrl = (env.GATEWAY_HTTP_URL || "").trim();
+
   if (!gatewayUrl) {
-    console.error(
-      "GATEWAY_HTTP_URL is empty. Put it in worker/.env.local and run via: npm run dev",
-    );
+    console.error("GATEWAY_HTTP_URL is empty. Configure it in ESA function settings.");
   } else {
     console.log(`monitor start: gateway=${gatewayUrl} node=${nodeName}`);
   }
 
-  const run = await nextRunCounter(env);
-  const { targets, refreshed, error: targetsError } = await loadTargets(env);
+  const run = await nextRunCounter(env, kv);
+  const { targets, refreshed, error: targetsError } = await loadTargets(env, kv);
 
   if (!targets?.all_ids?.length) {
     const status: NodeStatus = {
@@ -71,6 +40,11 @@ async function runMonitor(env: Env): Promise<Response | void> {
     return;
   }
 
+  const allTargets = targets.all_ids;
+  // 通过轮管逻辑切分本次查询的项目集合（确保不会触发 ESA 子请求限制）
+  const startIndex = ((run - 1) * maxProjectsPerRun) % allTargets.length;
+  const projectIds = allTargets.slice(startIndex, startIndex + maxProjectsPerRun);
+
   const allDiffs: DiffEvent[] = [];
   let worst: NodeStatus = {
     status: "healthy",
@@ -82,15 +56,10 @@ async function runMonitor(env: Env): Promise<Response | void> {
         : "OK",
   };
 
-  const projectIds = targets.all_ids;
-
-  await mapPool(projectIds, concurrency, async (projectId) => {
+  for (const projectId of projectIds) {
     try {
       const newStates = await fetchProjectStates(projectId, userAgent, sessdata);
-      const prevRaw = await env.PROBE_STATE.get<Record<string, TicketState>>(
-        stateKey(projectId),
-        "json",
-      );
+      const prevRaw = await kv.getJson<Record<string, TicketState>>(stateKey(projectId));
       const isFirst = !prevRaw;
       const oldStates = recordToStates(prevRaw);
 
@@ -99,10 +68,7 @@ async function runMonitor(env: Env): Promise<Response | void> {
         allDiffs.push(...diffs);
       }
 
-      await env.PROBE_STATE.put(
-        stateKey(projectId),
-        JSON.stringify(statesToRecord(newStates)),
-      );
+      await kv.put(stateKey(projectId), JSON.stringify(statesToRecord(newStates)));
     } catch (err) {
       console.error(`project ${projectId} failed:`, err);
       if (isRiskControlError(err)) {
@@ -110,8 +76,7 @@ async function runMonitor(env: Env): Promise<Response | void> {
           worst = {
             status: "risk_control",
             http_code: err instanceof HTTPError ? err.statusCode : 0,
-            message:
-              err instanceof Error ? err.message : "IP rate limited or blocked",
+            message: err instanceof Error ? err.message : "IP rate limited or blocked",
           };
         }
       } else if (worst.status === "healthy") {
@@ -122,22 +87,19 @@ async function runMonitor(env: Env): Promise<Response | void> {
         };
       }
     }
-  });
+  }
 
-  // 第 1 次必报（注册节点）；之后按 HEARTBEAT_EVERY_N_RUNS 或有 diff 时上报
-  const shouldHeartbeat =
-    run === 1 || run % heartbeatEvery === 0 || allDiffs.length > 0;
+  // 校验上报触发条件
+  const shouldHeartbeat = run === 1 || run % heartbeatEvery === 0 || allDiffs.length > 0;
   if (!shouldHeartbeat) {
-    console.log(
-      `skip report: run=${run} diffs=0 heartbeatEvery=${heartbeatEvery}`,
-    );
+    console.log(`skip report: run=${run} diffs=0 heartbeatEvery=${heartbeatEvery}`);
     return;
   }
 
   try {
     await reportToGateway(env, nodeName, worst, allDiffs);
     console.log(
-      `reported: node=${nodeName} diffs=${allDiffs.length} status=${worst.status} targets=${projectIds.length}`,
+      `reported: node=${nodeName} diffs=${allDiffs.length} status=${worst.status} targets=${projectIds.join(",")}`,
     );
   } catch (err) {
     console.error("report failed:", err);
@@ -149,18 +111,15 @@ export default {
     const url = new URL(request.url);
     const gateway = (env.GATEWAY_HTTP_URL || "").replace(/\/+$/, "");
 
-    // 本地 / 手动触发监测（Miniflare 不会自动跑 cron）
+    // 支持 /run、/__run 或 /__scheduled (Cron) 路由触发
     if (
       url.pathname === "/run" ||
       url.pathname === "/__run" ||
       (url.pathname === "/__scheduled" && request.method === "POST")
     ) {
-      if (request.method !== "GET" && request.method !== "POST") {
-        return new Response("Method Not Allowed", { status: 405 });
-      }
       try {
         await runMonitor(env);
-        return Response.json({ ok: true, triggered: true });
+        return Response.json({ ok: true, triggered: true, provider: "aliyun-esa" });
       } catch (err) {
         console.error("manual run failed:", err);
         return Response.json(
@@ -175,20 +134,14 @@ export default {
 
     return Response.json({
       ok: true,
-      node_name: env.NODE_NAME || "cf-worker-monitor",
+      node_name: env.NODE_NAME || "aliyun-esa-monitor",
       role: "monitor",
+      provider: "aliyun-esa",
       gateway_http_url: gateway || null,
       has_probe_token: Boolean(env.PROBE_TOKEN),
       has_sessdata: Boolean((env.SESSDATA || "").trim()),
-      hint: "POST or GET /run to trigger one monitor cycle (local cron is not auto)",
+      has_edge_kv: Boolean(env.PROBE_STATE),
+      hint: "POST or GET /run to trigger one monitor cycle",
     });
-  },
-
-  async scheduled(
-    _controller: ScheduledController,
-    env: Env,
-    ctx: ExecutionContext,
-  ): Promise<void> {
-    ctx.waitUntil(runMonitor(env));
   },
 };

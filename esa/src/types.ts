@@ -40,7 +40,7 @@ export type TargetsCache = {
 };
 
 export type Env = {
-  PROBE_STATE: KVNamespace;
+  PROBE_STATE?: KVNamespace; // 阿里云 ESA Edge KV 绑定，可选
   GATEWAY_HTTP_URL: string;
   PROBE_TOKEN?: string;
   NODE_NAME?: string;
@@ -50,5 +50,5 @@ export type Env = {
   SHARD_IDS?: string;
   TARGETS_TTL_SEC?: string;
   HEARTBEAT_EVERY_N_RUNS?: string;
-  MAX_CONCURRENCY?: string;
+  MAX_PROJECTS_PER_RUN?: string; // 阿里云 ESA 平台限制单次 fetch 数量，加入分批轮询大小限制
 };
