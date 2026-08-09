@@ -502,6 +502,59 @@ function upsertProbeNode(
   ).run(nodeName, now, status, httpCode, message, role);
 }
 
+// 辅探针（HTTP）无 WS close 回调，需按 last_heartbeat 过期清理。
+// worker 默认 cron 1min、HEARTBEAT_EVERY_N_RUNS=5，最坏约 5min 一次心跳；默认 TTL 15min。
+const NODE_OFFLINE_TTL_MS = Math.max(
+  60_000,
+  Number(process.env.NODE_OFFLINE_TTL_MS) || 15 * 60 * 1000,
+);
+const NODE_CLEANUP_INTERVAL_MS = Math.max(
+  5_000,
+  Number(process.env.NODE_CLEANUP_INTERVAL_MS) || 30_000,
+);
+
+/** 清理心跳过期且当前无 WS 连接的节点（主要覆盖 role=monitor 辅探针） */
+function cleanupStaleOfflineNodes(): string[] {
+  const cutoff = Date.now() - NODE_OFFLINE_TTL_MS;
+  const stale = db
+    .prepare(
+      `
+      SELECT name, COALESCE(role, 'primary') AS role
+      FROM nodes
+      WHERE last_heartbeat < ?
+    `,
+    )
+    .all(cutoff) as { name: string; role: string }[];
+
+  const removed: string[] = [];
+  let needReassign = false;
+
+  for (const row of stale) {
+    // 主探针以 WS 连接为准，在线则不删
+    if (activeSockets.has(row.name)) continue;
+
+    db.prepare("DELETE FROM nodes WHERE name = ?").run(row.name);
+    removed.push(row.name);
+
+    // 仅主探针参与分片；孤儿 primary 行需触发 reassignment
+    if (row.role !== "monitor") {
+      needReassign = true;
+    }
+  }
+
+  if (removed.length > 0) {
+    console.log(
+      `[Nodes] Cleaned ${removed.length} offline node(s) (ttl=${NODE_OFFLINE_TTL_MS}ms): ${removed.join(", ")}`,
+    );
+  }
+
+  if (needReassign) {
+    triggerReassignment();
+  }
+
+  return removed;
+}
+
 function getMonitorTargets() {
   const cores = db
     .prepare("SELECT id FROM projects WHERE type = 'core'")
@@ -521,6 +574,7 @@ function getMonitorTargets() {
 
 /** 前端 snapshot / status_update /api/nodes 共用，含 role 与分配任务数 */
 function listNodesForFrontend() {
+  cleanupStaleOfflineNodes();
   return db
     .prepare(
       `
@@ -940,6 +994,15 @@ const app = new Elysia({ adapter: node() })
     console.log(`🦊 Elysia is running at ${hostname}:${port}`);
   });
 
+// 定时清理离线辅探针 / 孤儿节点（无前端连接时也会跑）
+setInterval(() => {
+  try {
+    cleanupStaleOfflineNodes();
+  } catch (err) {
+    console.error("Periodic offline node cleanup failed:", err);
+  }
+}, NODE_CLEANUP_INTERVAL_MS);
+
 // 定时广播器：每 3 秒将最新节点、项目状态及完整的票种实时状态推送给所有前端
 setInterval(() => {
   if (activeFrontendSockets.size === 0) return;
@@ -977,3 +1040,7 @@ setInterval(() => {
     console.error("Periodic background status query failed:", err);
   }
 }, 3000);
+
+console.log(
+  `[Nodes] Offline TTL=${NODE_OFFLINE_TTL_MS}ms, cleanup every ${NODE_CLEANUP_INTERVAL_MS}ms`,
+);
