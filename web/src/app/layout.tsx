@@ -59,6 +59,8 @@ export default function RootLayout({
     >
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+        <script defer src="https://umami.xiaohan-kaka.top/script.js" data-website-id="0754720d-eae3-4303-ae9f-67e52d088745"></script>
+        <script defer src="https://umami.xiaohan-kaka.top/recorder.js" data-website-id="0754720d-eae3-4303-ae9f-67e52d088745"></script>
       </head>
       <body className="bg-background text-foreground min-h-full overflow-x-hidden font-sans">
         <AppProviders>{children}</AppProviders>
