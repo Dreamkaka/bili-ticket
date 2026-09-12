@@ -1,22 +1,39 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { toast } from "@heroui/react";
 import type { Diff } from "@/lib/types";
 import { tagForDiff } from "@/lib/diff";
+import { useToast, type ToastTone } from "@/components/ui/Toast";
 
 const MAX_TOASTS_PER_BATCH = 3;
+const SEED_KEY = "ticket-diff-toast-max-id";
 
-function toastVariant(
-  tone: "accent" | "danger" | "default"
-): "success" | "danger" | "default" | "accent" {
+function toastTone(tone: "accent" | "danger" | "default"): ToastTone {
   if (tone === "accent") return "success";
   if (tone === "danger") return "danger";
   return "default";
 }
 
+function readSeed(): number {
+  try {
+    const raw = sessionStorage.getItem(SEED_KEY);
+    const n = raw ? Number(raw) : 0;
+    return Number.isFinite(n) ? n : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function writeSeed(id: number) {
+  try {
+    sessionStorage.setItem(SEED_KEY, String(id));
+  } catch {
+    /* ignore */
+  }
+}
+
 /**
- * 监听 diffs 增量并弹出 Toast；首包（HTTP/bootstrap）不弹，避免刷新刷屏。
+ * 监听 diffs 增量并弹出 Toast；首包与回首页重挂载不弹。
  */
 export function useDiffToasts({
   diffs,
@@ -27,20 +44,23 @@ export function useDiffToasts({
   enabled: boolean;
   onSelectDiff?: (diff: Diff) => void;
 }) {
+  const { push } = useToast();
   const seededRef = useRef(false);
   const maxIdRef = useRef(0);
+  const pushRef = useRef(push);
+  const onSelectRef = useRef(onSelectDiff);
+  pushRef.current = push;
+  onSelectRef.current = onSelectDiff;
 
   useEffect(() => {
-    if (!enabled) {
-      seededRef.current = false;
-      maxIdRef.current = 0;
-      return;
-    }
+    if (!enabled || diffs.length === 0) return;
 
     const maxId = diffs.reduce((m, d) => Math.max(m, d.id ?? 0), 0);
 
     if (!seededRef.current) {
-      maxIdRef.current = maxId;
+      const stored = readSeed();
+      maxIdRef.current = Math.max(stored, maxId);
+      writeSeed(maxIdRef.current);
       seededRef.current = true;
       return;
     }
@@ -55,16 +75,18 @@ export function useDiffToasts({
       maxIdRef.current,
       ...incoming.map((d) => d.id ?? 0)
     );
+    writeSeed(maxIdRef.current);
 
     if (incoming.length > MAX_TOASTS_PER_BATCH) {
       const first = incoming[incoming.length - 1]!;
-      toast(`${incoming.length} 条票务变动`, {
+      pushRef.current({
+        title: `${incoming.length} 条票务变动`,
         description: first.ticket_name,
-        variant: "accent",
+        tone: "accent",
         timeout: 4500,
-        actionProps: {
-          children: "查看",
-          onPress: () => onSelectDiff?.(first),
+        action: {
+          label: "查看",
+          onClick: () => onSelectRef.current?.(first),
         },
       });
       return;
@@ -72,7 +94,8 @@ export function useDiffToasts({
 
     for (const diff of incoming) {
       const tag = tagForDiff(diff);
-      toast(`${tag.label} · ${diff.ticket_name}`, {
+      pushRef.current({
+        title: `${tag.label} · ${diff.ticket_name}`,
         description: [
           diff.project_name,
           `${diff.old_status} → ${diff.new_status}`,
@@ -80,13 +103,13 @@ export function useDiffToasts({
         ]
           .filter(Boolean)
           .join(" · "),
-        variant: toastVariant(tag.tone),
+        tone: toastTone(tag.tone),
         timeout: 4500,
-        actionProps: {
-          children: "聚焦",
-          onPress: () => onSelectDiff?.(diff),
+        action: {
+          label: "查看",
+          onClick: () => onSelectRef.current?.(diff),
         },
       });
     }
-  }, [diffs, enabled, onSelectDiff]);
+  }, [diffs, enabled]);
 }

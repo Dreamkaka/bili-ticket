@@ -9,8 +9,11 @@ export interface Project {
   project_label: string | null;
 }
 
-/** primary=Go 主探针；monitor=Worker 辅助监测 */
+/** primary=主探针（Go/Deno）；monitor=辅助监测 */
 export type NodeRole = "primary" | "monitor" | string;
+
+/** ws=常驻长连接（Go）；http=serverless（Deno/CF worker） */
+export type NodeTransport = "ws" | "http" | string;
 
 export interface Node {
   name: string;
@@ -21,6 +24,8 @@ export interface Node {
   assigned_project_count?: number;
   /** 缺省视为 primary，兼容旧数据 */
   role?: NodeRole;
+  /** 缺省视为 ws，兼容旧数据 */
+  transport?: NodeTransport;
 }
 
 export interface Ticket {

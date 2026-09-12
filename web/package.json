@@ -8,9 +8,12 @@
     "start": "next start"
   },
   "dependencies": {
-    "@heroui/react": "^3.2.2",
-    "@heroui/styles": "^3.2.2",
+    "@fumadocs/language": "^0.2.4",
     "@internationalized/date": "^3.12.2",
+    "@types/mdx": "^2.0.14",
+    "fumadocs-core": "^16.15.8",
+    "fumadocs-mdx": "^15.4.0",
+    "fumadocs-ui": "^16.15.8",
     "next": "16.2.10",
     "react": "19.2.4",
     "react-dom": "19.2.4",

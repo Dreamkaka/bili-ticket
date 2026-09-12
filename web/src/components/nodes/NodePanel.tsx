@@ -1,43 +1,52 @@
 "use client";
 
 import { memo, type CSSProperties } from "react";
-import { Card, Chip } from "@heroui/react";
 import type { Node } from "@/lib/types";
-import { formatClock, isMonitorRole, isNodeAlive } from "@/lib/status";
+import {
+  formatClock,
+  isMonitorRole,
+  isNodeAlive,
+  isServerlessPrimary,
+} from "@/lib/status";
+import { Badge, type BadgeTone } from "@/components/ui/Badge";
 
-function nodeState(node: Node) {
-  const alive = isNodeAlive(node.last_heartbeat, Date.now(), node.role);
+function nodeState(node: Node): { label: string; tone: BadgeTone } {
+  const alive = isNodeAlive(
+    node.last_heartbeat,
+    Date.now(),
+    node.role,
+    node.transport,
+  );
   const risk =
     node.status === "risk_control" ||
     [412, 403, 429].includes(node.last_http_code);
   const error =
     node.status === "error" || (node.last_http_code !== 200 && !risk);
 
-  if (risk) return { label: "风控", color: "warning" as const };
-  if (error) return { label: "错误", color: "danger" as const };
-  if (!alive) return { label: "离线", color: "default" as const };
-  return { label: "正常", color: "accent" as const };
+  if (risk) return { label: "风控", tone: "warning" };
+  if (error) return { label: "错误", tone: "danger" };
+  if (!alive) return { label: "离线", tone: "default" };
+  return { label: "正常", tone: "accent" };
 }
 
 function roleMeta(node: Node) {
   if (isMonitorRole(node.role)) {
+    return { label: "MONITOR", zh: "辅助监测", tone: "default" as BadgeTone };
+  }
+  if (isServerlessPrimary(node.role, node.transport)) {
     return {
-      label: "MONITOR",
-      zh: "辅助监测",
-      color: "default" as const,
+      label: "PRIMARY",
+      zh: "Serverless 主探针",
+      tone: "accent" as BadgeTone,
     };
   }
-  return {
-    label: "PRIMARY",
-    zh: "主探针",
-    color: "accent" as const,
-  };
+  return { label: "PRIMARY", zh: "主探针", tone: "accent" as BadgeTone };
 }
 
 export const NodePanel = memo(function NodePanel({ nodes }: { nodes: Node[] }) {
   if (nodes.length === 0) {
     return (
-      <div className="theme-panel theme-ink-faint flex min-h-28 items-center justify-center border text-sm">
+      <div className="ak-panel theme-ink-faint flex min-h-28 items-center justify-center text-sm">
         暂无采集节点
       </div>
     );
@@ -57,9 +66,10 @@ export const NodePanel = memo(function NodePanel({ nodes }: { nodes: Node[] }) {
         const state = nodeState(node);
         const role = roleMeta(node);
         const monitor = isMonitorRole(node.role);
+        const serverless = isServerlessPrimary(node.role, node.transport);
 
         return (
-          <Card
+          <div
             key={node.name}
             style={
               {
@@ -67,45 +77,33 @@ export const NodePanel = memo(function NodePanel({ nodes }: { nodes: Node[] }) {
               } as CSSProperties
             }
             className={[
-              "reveal-child ui-panel theme-panel rounded-none border border-[var(--hairline)] shadow-none",
+              "reveal-child ak-panel overflow-hidden",
               monitor ? "border-l-2 border-l-[var(--accent)]/40 opacity-95" : "",
             ]
               .filter(Boolean)
               .join(" ")}
           >
-            <Card.Header className="flex items-start justify-between gap-2 p-5 pb-3">
+            <div className="flex items-start justify-between gap-2 p-5 pb-3">
               <div className="min-w-0">
-                <div className="mb-1 flex flex-wrap items-center gap-1.5">
-                  <Chip
-                    size="sm"
-                    variant="soft"
-                    color={role.color}
-                    className="rounded-sm"
-                  >
-                    {role.label}
-                  </Chip>
+                <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
+                  <Badge tone={role.tone}>{role.label}</Badge>
                   <span className="theme-ink-faint font-mono text-[10px] tracking-wider">
                     {role.zh}
                   </span>
                 </div>
-                <Card.Title className="theme-ink truncate text-sm font-semibold">
+                <p className="theme-ink truncate text-sm font-semibold">
                   {node.name}
-                </Card.Title>
-                <Card.Description className="theme-ink-faint font-mono text-[10px] tracking-wider">
+                </p>
+                <p className="theme-ink-faint mt-0.5 font-mono text-[10px] tracking-wider">
                   HB // {formatClock(node.last_heartbeat)}
-                  {monitor ? " · CRON" : ""}
-                </Card.Description>
+                  {monitor || serverless ? " · CRON" : ""}
+                </p>
               </div>
-              <Chip
-                size="sm"
-                variant="soft"
-                color={state.color}
-                className="shrink-0 rounded-sm"
-              >
+              <Badge tone={state.tone} className="shrink-0">
                 {state.label}
-              </Chip>
-            </Card.Header>
-            <Card.Content className="theme-ink-soft space-y-2 px-5 pb-5 text-sm">
+              </Badge>
+            </div>
+            <div className="theme-ink-soft space-y-2 px-5 pb-5 text-sm">
               <div className="flex justify-between">
                 <span>HTTP</span>
                 <span
@@ -119,11 +117,13 @@ export const NodePanel = memo(function NodePanel({ nodes }: { nodes: Node[] }) {
                 </span>
               </div>
               <div className="flex justify-between">
-                <span>{monitor ? "范围" : "任务"}</span>
+                <span>{monitor || serverless ? "范围" : "任务"}</span>
                 <span className="theme-ink">
                   {monitor
                     ? "全量"
-                    : (node.assigned_project_count ?? 0)}
+                    : serverless
+                      ? "全量冗余"
+                      : (node.assigned_project_count ?? 0)}
                 </span>
               </div>
               {monitor && (
@@ -131,13 +131,18 @@ export const NodePanel = memo(function NodePanel({ nodes }: { nodes: Node[] }) {
                   不参与分片 · 冗余校验
                 </div>
               )}
+              {serverless && (
+                <div className="theme-ink-faint font-mono text-[10px] tracking-wide">
+                  与主探针同级 · 不参与分片
+                </div>
+              )}
               {node.last_error_message && (
-                <div className="mt-2 overflow-x-auto border border-danger/25 bg-danger/10 p-2 font-mono text-[10px] text-danger whitespace-pre-wrap">
+                <div className="mt-2 max-h-24 overflow-auto border border-danger/25 bg-danger/10 p-2 font-mono text-[10px] whitespace-pre-wrap text-danger">
                   {node.last_error_message}
                 </div>
               )}
-            </Card.Content>
-          </Card>
+            </div>
+          </div>
         );
       })}
     </div>

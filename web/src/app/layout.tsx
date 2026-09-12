@@ -31,7 +31,7 @@ export const viewport: Viewport = {
 const themeInitScript = `
 (function(){
   try {
-    var k='ticket-monitor-theme';
+    var k='theme';
     var t=localStorage.getItem(k);
     if(t!=='light'&&t!=='dark'){
       t=window.matchMedia('(prefers-color-scheme: light)').matches?'light':'dark';
@@ -53,7 +53,8 @@ export default function RootLayout({
   return (
     <html
       lang="zh-CN"
-      className={`dark ${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      data-scroll-behavior="smooth"
+      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
       data-theme="dark"
       suppressHydrationWarning
     >
@@ -63,7 +64,9 @@ export default function RootLayout({
         <script defer src="https://umami.xiaohan-kaka.top/recorder.js" data-website-id="0754720d-eae3-4303-ae9f-67e52d088745"></script>
       </head>
       <body className="bg-background text-foreground min-h-full overflow-x-hidden font-sans">
-        <AppProviders>{children}</AppProviders>
+        <AppProviders>
+          <div className="flex min-h-dvh flex-col">{children}</div>
+        </AppProviders>
       </body>
     </html>
   );

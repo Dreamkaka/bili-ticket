@@ -1,13 +1,10 @@
 "use client";
 
-import { memo, useEffect, useMemo, useState } from "react";
-import { Calendar } from "@heroui/react";
+import { memo, useMemo, useState } from "react";
 import {
   getLocalTimeZone,
-  isToday,
   today,
   type CalendarDate,
-  type DateValue,
 } from "@internationalized/date";
 import type { Project, Ticket } from "@/lib/types";
 import {
@@ -20,11 +17,22 @@ import {
 import { isAvailableStatus } from "@/lib/status";
 import { scrollToId } from "@/lib/command";
 
+const WEEKDAYS = ["一", "二", "三", "四", "五", "六", "日"];
+
 function calendarSignature(projects: Project[]): string {
   return projects
     .map((p) => `${p.id}:${p.project_label ?? ""}`)
     .sort()
     .join("|");
+}
+
+function pad(n: number): string {
+  return String(n).padStart(2, "0");
+}
+
+function calFromKey(key: string): CalendarDate {
+  const [y, m, d] = key.split("-").map(Number);
+  return { year: y, month: m, day: d } as CalendarDate;
 }
 
 export const EventCalendar = memo(function EventCalendar({
@@ -44,9 +52,17 @@ export const EventCalendar = memo(function EventCalendar({
     [calSig]
   );
   const eventDayCount = countEventDays(eventMap);
-  const eventKeys = useMemo(
-    () => Array.from(eventMap.keys()).sort().join("|"),
-    [eventMap]
+
+  const todayDate = today(getLocalTimeZone());
+  const initial = useMemo(
+    () => pickInitialFocus(eventMap, todayDate),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [calSig]
+  );
+
+  const [view, setView] = useState({ year: initial.year, month: initial.month });
+  const [selectedKey, setSelectedKey] = useState<string | null>(
+    dateKey(initial)
   );
 
   const ticketsByProject = useMemo(() => {
@@ -58,114 +74,143 @@ export const EventCalendar = memo(function EventCalendar({
     }
     return map;
   }, [tickets]);
-  const tz = getLocalTimeZone();
-  const todayDate = today(tz);
 
-  const [value, setValue] = useState<CalendarDate | null>(() =>
-    pickInitialFocus(eventMap, todayDate)
-  );
-  const [focusedValue, setFocusedValue] = useState<CalendarDate>(() =>
-    pickInitialFocus(eventMap, todayDate)
-  );
-  const [seededKeys, setSeededKeys] = useState(eventKeys);
-
-  useEffect(() => {
-    if (eventKeys === seededKeys) return;
-    const next = pickInitialFocus(eventMap, today(getLocalTimeZone()));
-    setValue(next);
-    setFocusedValue(next);
-    setSeededKeys(eventKeys);
-  }, [eventKeys, eventMap, seededKeys]);
-
-  const selectedKey = value ? dateKey(value) : null;
   const dayProjects = selectedKey ? eventMap.get(selectedKey) ?? [] : [];
 
-  const hasEvent = (date: CalendarDate) => eventMap.has(dateKey(date));
-
-  const handleSelect = (next: DateValue | null) => {
-    if (!next) {
-      setValue(null);
-      return;
-    }
-    const cal = next as CalendarDate;
-    setValue(cal);
-    setFocusedValue(cal);
+  const shiftMonth = (delta: number) => {
+    setView((v) => {
+      const idx = v.year * 12 + (v.month - 1) + delta;
+      return { year: Math.floor(idx / 12), month: (idx % 12) + 1 };
+    });
   };
+
+  const goToday = () => {
+    setView({ year: todayDate.year, month: todayDate.month });
+    setSelectedKey(dateKey(todayDate));
+  };
+
+  // 月历单元格：周一开头
+  const cells = useMemo(() => {
+    const firstWeekday = (new Date(view.year, view.month - 1, 1).getDay() + 6) % 7;
+    const daysInMonth = new Date(view.year, view.month, 0).getDate();
+    const out: (string | null)[] = [];
+    for (let i = 0; i < firstWeekday; i++) out.push(null);
+    for (let d = 1; d <= daysInMonth; d++) {
+      out.push(`${view.year}-${pad(view.month)}-${pad(d)}`);
+    }
+    while (out.length % 7 !== 0) out.push(null);
+    return out;
+  }, [view]);
 
   const openProject = (project: Project) => {
     onSelectProject?.(project.id);
-    scrollToId(`project-${project.id}`);
+    scrollToId("pane-projects");
+    window.setTimeout(() => scrollToId(`project-${project.id}`), 40);
   };
 
   return (
-    <div className="grid grid-cols-1 gap-6 xl:grid-cols-12">
-      <div className="reveal-child theme-panel min-w-0 border p-3 sm:p-4 xl:col-span-5 [--reveal-delay:100ms]">
-        <Calendar
-          aria-label="活动日历"
-          className="w-full max-w-none bg-transparent shadow-none"
-          value={value}
-          onChange={handleSelect}
-          focusedValue={focusedValue}
-          onFocusChange={setFocusedValue}
-          weeksInMonth={6}
-        >
-          <Calendar.Header>
-            <Calendar.Heading className="theme-ink text-sm font-semibold tracking-wide" />
-            <Calendar.NavButton slot="previous" />
-            <Calendar.NavButton slot="next" />
-          </Calendar.Header>
-          <Calendar.Grid>
-            <Calendar.GridHeader>
-              {(day) => (
-                <Calendar.HeaderCell className="theme-ink-faint text-[10px]">
-                  {day}
-                </Calendar.HeaderCell>
-              )}
-            </Calendar.GridHeader>
-            <Calendar.GridBody>
-              {(date) => (
-                <Calendar.Cell date={date}>
-                  {({ formattedDate }) => (
-                    <>
-                      {formattedDate}
-                      {(hasEvent(date) || isToday(date, tz)) && (
-                        <Calendar.CellIndicator
-                          className={
-                            hasEvent(date)
-                              ? "bg-accent"
-                              : "bg-[var(--ink-faint)]"
-                          }
-                        />
-                      )}
-                    </>
-                  )}
-                </Calendar.Cell>
-              )}
-            </Calendar.GridBody>
-          </Calendar.Grid>
-        </Calendar>
+    <div className="grid grid-cols-1 gap-4 sm:gap-6 min-[900px]:grid-cols-12">
+      <div className="reveal-child ak-panel min-w-0 p-3 sm:p-4 min-[900px]:col-span-5 [--reveal-delay:100ms]">
+        <div className="mb-2 flex items-center justify-between gap-2 px-1">
+          <p className="theme-ink text-sm font-semibold tracking-wide tabular-nums">
+            {view.year} / {pad(view.month)}
+          </p>
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={goToday}
+              className="theme-ink-faint border border-[var(--hairline)] px-2 py-1 text-[10px] tracking-wider transition-colors hover:border-accent/50 hover:text-accent"
+            >
+              今天
+            </button>
+            <button
+              type="button"
+              onClick={() => shiftMonth(-1)}
+              className="theme-ink-faint flex h-7 w-7 items-center justify-center border border-[var(--hairline)] transition-colors hover:border-accent/50 hover:text-accent"
+              aria-label="上个月"
+            >
+              ‹
+            </button>
+            <button
+              type="button"
+              onClick={() => shiftMonth(1)}
+              className="theme-ink-faint flex h-7 w-7 items-center justify-center border border-[var(--hairline)] transition-colors hover:border-accent/50 hover:text-accent"
+              aria-label="下个月"
+            >
+              ›
+            </button>
+          </div>
+        </div>
 
-        <div className="theme-ink-faint mt-3 flex flex-wrap items-center gap-4 text-[10px] tracking-wider">
+        <div
+          className="grid grid-cols-7 gap-1 text-center"
+          role="grid"
+          aria-label="活动日历"
+        >
+          {WEEKDAYS.map((w) => (
+            <div
+              key={w}
+              className="theme-ink-faint py-1 text-[10px] font-medium tracking-wider"
+            >
+              {w}
+            </div>
+          ))}
+          {cells.map((key, i) => {
+            if (!key) return <div key={`e-${i}`} aria-hidden />;
+            const day = Number(key.slice(-2));
+            const hasEvent = eventMap.has(key);
+            const isToday = key === dateKey(todayDate);
+            const isSelected = key === selectedKey;
+            return (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setSelectedKey(key)}
+                aria-label={key}
+                aria-pressed={isSelected}
+                className={`relative flex aspect-square items-center justify-center text-xs tabular-nums transition-colors duration-200 ${
+                  isSelected
+                    ? "bg-accent font-semibold text-accent-foreground"
+                    : hasEvent
+                      ? "theme-ink font-semibold hover:bg-accent/15"
+                      : "theme-ink-soft hover:bg-[var(--surface-secondary)]"
+                } ${isToday && !isSelected ? "ring-1 ring-[var(--ink-faint)]" : ""}`}
+              >
+                {day}
+                {hasEvent && !isSelected && (
+                  <span
+                    className="absolute bottom-1 h-1 w-1 bg-accent"
+                    aria-hidden
+                  />
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="theme-ink-faint mt-3 flex flex-wrap items-center gap-4 border-t border-[var(--hairline)] px-1 pt-3 text-[10px] tracking-wider">
           <span className="inline-flex items-center gap-1.5">
-            <span className="h-1.5 w-1.5 rounded-full bg-accent" />
+            <span className="h-1.5 w-1.5 bg-accent" />
             有活动
           </span>
           <span className="inline-flex items-center gap-1.5">
-            <span className="h-1.5 w-1.5 rounded-full bg-[var(--ink-faint)]" />
+            <span className="h-1.5 w-1.5 ring-1 ring-[var(--ink-faint)]" />
             今天
           </span>
           <span className="ml-auto font-mono">{eventDayCount} DAYS</span>
         </div>
       </div>
 
-      <div className="reveal-child theme-panel min-w-0 border xl:col-span-7 [--reveal-delay:180ms]">
+      <div className="reveal-child ak-panel min-w-0 overflow-hidden min-[900px]:col-span-7 [--reveal-delay:180ms]">
         <div className="theme-hairline flex items-end justify-between gap-3 border-b px-4 py-3 sm:px-5">
           <div>
             <p className="theme-ink-faint text-[10px] tracking-[0.22em]">
               SELECTED DAY
             </p>
             <p className="theme-ink ak-date mt-1 text-sm font-semibold tracking-wide">
-              {value ? formatAkDateFromCalendar(value) : "未选择日期"}
+              {selectedKey
+                ? formatAkDateFromCalendar(calFromKey(selectedKey))
+                : "未选择日期"}
             </p>
           </div>
           <p className="theme-ink-faint font-mono text-[10px] tracking-wider">
@@ -173,8 +218,8 @@ export const EventCalendar = memo(function EventCalendar({
           </p>
         </div>
 
-        <div className="max-h-[22rem] space-y-0 overflow-y-auto">
-          {!value ? (
+        <div className="thin-scroll max-h-[22rem] overflow-y-auto">
+          {!selectedKey ? (
             <p className="theme-ink-faint px-5 py-10 text-center text-sm">
               在日历中选择日期查看活动
             </p>
@@ -198,6 +243,17 @@ export const EventCalendar = memo(function EventCalendar({
                   style={{ animationDelay: `${Math.min(index, 8) * 45}ms` }}
                   className="stagger-item theme-hairline flex min-h-14 w-full items-start gap-3 border-b px-3 py-3.5 text-left transition-colors last:border-b-0 hover:bg-accent/10 sm:min-h-0 sm:px-5"
                 >
+                  {project.cover && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={project.cover}
+                      alt=""
+                      loading="lazy"
+                      decoding="async"
+                      className="h-14 w-10 shrink-0 object-cover ring-1 ring-[var(--hairline)]"
+                      referrerPolicy="no-referrer"
+                    />
+                  )}
                   <div className="min-w-0 flex-1">
                     <div className="flex min-w-0 items-center gap-2">
                       <span className="shrink-0 bg-accent/15 px-1.5 py-0.5 text-[10px] font-bold tracking-wider text-accent uppercase">

@@ -9,9 +9,9 @@ import {
   useState,
   type UIEvent,
 } from "react";
-import { Chip } from "@heroui/react";
 import type { Diff } from "@/lib/types";
 import { formatAkDateTime } from "@/lib/status";
+import { Badge } from "@/components/ui/Badge";
 import {
   FEED_FILTERS,
   filterDiffs,
@@ -23,10 +23,7 @@ import {
 const ROW_H = 96;
 const OVERSCAN = 8;
 
-function streamViewportHeight(): number {
-  if (typeof window === "undefined") return 420;
-  return Math.min(520, Math.max(280, Math.round(window.innerHeight * 0.55)));
-}
+
 
 const EventRow = memo(function EventRow({
   diff,
@@ -50,15 +47,13 @@ const EventRow = memo(function EventRow({
           alt=""
           loading="lazy"
           decoding="async"
-          className="hidden h-12 w-9 shrink-0 object-cover ring-1 ring-[var(--hairline)] sm:block"
+          className="h-10 w-8 shrink-0 object-cover ring-1 ring-[var(--hairline)] sm:h-12 sm:w-9"
           referrerPolicy="no-referrer"
         />
       ) : null}
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
-          <Chip size="sm" variant="soft" color={tag.tone} className="rounded-sm">
-            {tag.label}
-          </Chip>
+          <Badge tone={tag.tone}>{tag.label}</Badge>
           {diff.project_name ? (
             <span className="theme-ink-faint truncate text-xs">
               {diff.project_name}
@@ -126,10 +121,13 @@ export const EventStream = memo(function EventStream({
   const scrollerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const sync = () => setViewportH(streamViewportHeight());
+    const el = scrollerRef.current;
+    if (!el) return;
+    const sync = () => setViewportH(Math.max(240, el.clientHeight));
     sync();
-    window.addEventListener("resize", sync);
-    return () => window.removeEventListener("resize", sync);
+    const observer = new ResizeObserver(sync);
+    observer.observe(el);
+    return () => observer.disconnect();
   }, []);
 
   const { onScroll, totalH, start, end, offsetY, resetScroll } = useVirtualWindow(
@@ -147,7 +145,7 @@ export const EventStream = memo(function EventStream({
   const slice = useMemo(() => list.slice(start, end), [list, start, end]);
 
   return (
-    <div id="events" className="reveal-child theme-panel section-block border [--reveal-delay:180ms]">
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <div className="theme-hairline flex flex-col gap-3 border-b px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between sm:px-5 sm:py-4">
         <div>
           <p className="text-[10px] font-semibold tracking-[0.25em] text-accent">
@@ -156,7 +154,7 @@ export const EventStream = memo(function EventStream({
           <p className="theme-ink mt-1 text-sm font-medium">实时事件流</p>
           <p className="theme-ink-faint mt-0.5 text-xs">主显示区 · 最近状态变动</p>
         </div>
-        <div className="flex flex-wrap gap-1">
+        <div className="flex flex-wrap gap-1.5">
           {FEED_FILTERS.map((f) => {
             const active = filter === f.id;
             return (
@@ -167,7 +165,7 @@ export const EventStream = memo(function EventStream({
                 className={`min-h-9 px-2.5 py-1.5 text-xs font-medium transition-all duration-300 sm:min-h-0 sm:py-1 ${
                   active
                     ? "bg-accent text-accent-foreground"
-                    : "theme-ink-faint border border-[var(--hairline)] hover:text-ink"
+                    : "theme-ink-faint border border-[var(--hairline)] hover:border-accent/40 hover:text-ink"
                 }`}
               >
                 {f.label}
@@ -178,14 +176,13 @@ export const EventStream = memo(function EventStream({
       </div>
 
       {list.length === 0 ? (
-        <div className="theme-ink-faint flex min-h-40 items-center justify-center px-5 py-10 text-sm">
+        <div className="theme-ink-faint flex min-h-0 flex-1 items-center justify-center px-5 py-10 text-sm">
           暂无事件
         </div>
       ) : (
         <div
           ref={scrollerRef}
-          className="overflow-y-auto overscroll-contain"
-          style={{ height: viewportH }}
+          className="thin-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain"
           onScroll={onScroll}
         >
           <div style={{ height: totalH, position: "relative" }}>

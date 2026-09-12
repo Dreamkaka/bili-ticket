@@ -1,4 +1,7 @@
 import type { NextConfig } from "next";
+import { createMDX } from "fumadocs-mdx/next";
+
+const withMDX = createMDX();
 
 // 服务端 rewrite 优先使用专用变量；未设置时复用浏览器公开的后端地址。
 // 这样只配置 NEXT_PUBLIC_BASE_URL 也不会回退到本地 gateway。
@@ -8,6 +11,7 @@ const gateway =
   "http://127.0.0.1:3000";
 
 const nextConfig: NextConfig = {
+  allowedDevOrigins: ["127.0.0.1", "localhost"],
   async rewrites() {
     const base = gateway.replace(/\/$/, "");
     const rewrites = [
@@ -29,4 +33,4 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+export default withMDX(nextConfig);

@@ -1,0 +1,27 @@
+---
+title: 架构演进：从单点轮询到分布式分片与冗余
+description: 探讨高可用票务监控背后的多节点探针设计与 WebSocket 广播架构
+author: 架构小分队
+date: 2026-09-01
+tags: ["架构", "分布式", "WebSocket"]
+summary: 详细解析监控网关 Gateway、Go 主探针分片池与 Deno 全量冗余双轨制设计。
+---
+在早期的监票方案中，单机轮询极易遭遇目标平台 IP 速率限制与风控封禁。为了保证监控的实时性与稳定性，我们将系统升级为**多节点分片 + 冗余架构**。
+
+## 双轨制采集体系
+
+1. **Go Probe（主·WS 分片池）**：
+  - 探针通过 WebSocket 连接到 Gateway，Gateway 统一按 Round-Robin 算法为各个在线探针分配 Target 集合。
+  - 当节点上下线时，Gateway 动态触发 Reassignment 分片重平衡。
+2. **Deno Deploy（主·HTTP 冗余）**：
+  - 利用边缘网络执行全量兜底监控，每分钟通过 Cron 触发。
+  - 即使所有 WS 分片节点受阻，冗余层依然能持续发现库存异动。
+
+## 前端数据流
+
+前端看板通过单个 WebSocket 长连接直连 Gateway，接收三类消息：
+
+- `snapshot`：全量项目与节点快照。
+- `diff`：库存或可售状态变动增量。
+- `status_update`：3 秒一次心跳与引用稳定化数据。
+

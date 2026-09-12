@@ -1,0 +1,19 @@
+{
+  "name": "ticket-deno-probe",
+  "version": "0.1.0",
+  "exports": "./src/index.ts",
+  "tasks": {
+    "dev": "deno run --allow-net --allow-env --allow-read --allow-write --env-file=.env.local src/index.ts",
+    "check": "deno check src/index.ts",
+    "deploy": "deployctl deploy --prod --project=ticket-deno-probe src/index.ts"
+  },
+  "unstable": ["kv", "cron"],
+  "fmt": {
+    "lineWidth": 80
+  },
+  "lint": {
+    "rules": {
+      "exclude": ["no-explicit-any"]
+    }
+  }
+}

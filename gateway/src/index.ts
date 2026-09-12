@@ -146,6 +146,9 @@ try {
   if (!nodeColumns.includes("role")) {
     db.exec("ALTER TABLE nodes ADD COLUMN role TEXT DEFAULT 'primary';");
   }
+  if (!nodeColumns.includes("transport")) {
+    db.exec("ALTER TABLE nodes ADD COLUMN transport TEXT DEFAULT 'ws';");
+  }
 } catch (e) {
   console.error("Database nodes.role migration failed:", e);
 }
@@ -486,24 +489,26 @@ function upsertProbeNode(
   status: string,
   httpCode: number,
   message: string,
+  transport = "ws",
 ) {
   const now = Date.now();
   db.prepare(
     `
-    INSERT INTO nodes (name, last_heartbeat, reassign_pending, status, last_http_code, last_error_message, role)
-    VALUES (?, ?, 0, ?, ?, ?, ?)
+    INSERT INTO nodes (name, last_heartbeat, reassign_pending, status, last_http_code, last_error_message, role, transport)
+    VALUES (?, ?, 0, ?, ?, ?, ?, ?)
     ON CONFLICT(name) DO UPDATE SET
       last_heartbeat = excluded.last_heartbeat,
       status = excluded.status,
       last_http_code = excluded.last_http_code,
       last_error_message = excluded.last_error_message,
-      role = excluded.role
+      role = excluded.role,
+      transport = excluded.transport
   `,
-  ).run(nodeName, now, status, httpCode, message, role);
+  ).run(nodeName, now, status, httpCode, message, role, transport);
 }
 
-// 辅探针（HTTP）无 WS close 回调，需按 last_heartbeat 过期清理。
-// worker 默认 cron 1min、HEARTBEAT_EVERY_N_RUNS=5，最坏约 5min 一次心跳；默认 TTL 15min。
+// HTTP 探针（Deno serverless 主探针 / worker 辅探针）无 WS close 回调，需按 last_heartbeat 过期清理。
+// cron 1min、HEARTBEAT_EVERY_N_RUNS 默认 1，最坏约 1~5min 一次心跳；默认 TTL 15min。
 const NODE_OFFLINE_TTL_MS = Math.max(
   60_000,
   Number(process.env.NODE_OFFLINE_TTL_MS) || 15 * 60 * 1000,
@@ -519,12 +524,12 @@ function cleanupStaleOfflineNodes(): string[] {
   const stale = db
     .prepare(
       `
-      SELECT name, COALESCE(role, 'primary') AS role
+      SELECT name, COALESCE(role, 'primary') AS role, COALESCE(transport, 'ws') AS transport
       FROM nodes
       WHERE last_heartbeat < ?
     `,
     )
-    .all(cutoff) as { name: string; role: string }[];
+    .all(cutoff) as { name: string; role: string; transport: string }[];
 
   const removed: string[] = [];
   let needReassign = false;
@@ -536,8 +541,8 @@ function cleanupStaleOfflineNodes(): string[] {
     db.prepare("DELETE FROM nodes WHERE name = ?").run(row.name);
     removed.push(row.name);
 
-    // 仅主探针参与分片；孤儿 primary 行需触发 reassignment
-    if (row.role !== "monitor") {
+    // 仅 WS 主探针参与分片；HTTP 主探针（如 Deno serverless）全量冗余，过期不触发 reassignment
+    if (row.role !== "monitor" && row.transport === "ws") {
       needReassign = true;
     }
   }
@@ -586,6 +591,7 @@ function listNodesForFrontend() {
         n.last_http_code,
         n.last_error_message,
         COALESCE(n.role, 'primary') AS role,
+        COALESCE(n.transport, 'ws') AS transport,
         (SELECT COUNT(*) FROM projects p WHERE p.assigned_node = n.name) AS assigned_project_count
       FROM nodes n
     `,
@@ -655,7 +661,7 @@ const app = new Elysia({ adapter: node() })
           activeSockets.set(nodeName, ws);
           socketToNodeMap.set(ws.id, nodeName);
 
-          upsertProbeNode(nodeName, "primary", "healthy", 200, "");
+          upsertProbeNode(nodeName, "primary", "healthy", 200, "", "ws");
 
           triggerReassignment();
 
@@ -852,14 +858,18 @@ const app = new Elysia({ adapter: node() })
         String(body?.role || "monitor").trim() === "primary"
           ? "primary"
           : "monitor";
+      // HTTP 上报的探针（Deno serverless / CF worker）标记 transport=http；
+      // role=primary+http 视为与 WS 主探针同级，但不参与分片、不触发 reassignment
+      const transport =
+        String(body?.transport || "http").trim() === "ws" ? "ws" : "http";
       const statusPayload = body?.status || {};
       const status = String(statusPayload.status || "healthy");
       const httpCode = Number(statusPayload.http_code ?? 200);
       const message = String(statusPayload.message || "");
 
       try {
-        // monitor 节点不进入 activeSockets，不触发 reassignment
-        upsertProbeNode(nodeName, role, status, httpCode, message);
+        // HTTP 节点不进入 activeSockets；HTTP 主探针全量冗余，不触发 reassignment
+        upsertProbeNode(nodeName, role, status, httpCode, message, transport);
 
         const diffs = Array.isArray(body?.diffs) ? body.diffs : [];
         if (diffs.length > 0) {
@@ -877,6 +887,7 @@ const app = new Elysia({ adapter: node() })
       body: t.Object({
         node_name: t.String(),
         role: t.Optional(t.String()),
+        transport: t.Optional(t.String()),
         status: t.Optional(
           t.Object({
             status: t.Optional(t.String()),

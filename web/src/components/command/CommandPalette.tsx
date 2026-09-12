@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Modal } from "@heroui/react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ConnectionStatus, Project } from "@/lib/types";
 import { formatClock } from "@/lib/status";
-import { useTheme } from "@/lib/theme";
+import { Modal } from "@/components/ui/Modal";
+import { useTheme } from "next-themes";
 import {
   GROUP_LABEL,
   matchesQuery,
@@ -36,7 +36,10 @@ export function CommandPalette({
   onSelectProject?: (id: string) => void;
   onOpenNotifications?: () => void;
 }) {
-  const { theme, toggleTheme } = useTheme();
+  const { resolvedTheme, setTheme } = useTheme();
+  const toggleTheme = useCallback(() => {
+    setTheme(resolvedTheme === "dark" ? "light" : "dark");
+  }, [resolvedTheme, setTheme]);
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -59,25 +62,17 @@ export function CommandPalette({
         id: "nav-home",
         group: "nav",
         label: "首页",
-        description: "INDEX · 首屏舞台",
-        keywords: ["home", "index", "首页", "顶栏"],
-        run: () => scrollToId("home"),
+        description: "HERO · 主展会",
+        keywords: ["home", "index", "首页", "顶栏", "hero"],
+        run: () => scrollToId("pane-hero"),
       },
       {
-        id: "nav-calendar",
+        id: "nav-tickets",
         group: "nav",
-        label: "活动日历",
-        description: "CALENDAR · 举办日期",
-        keywords: ["calendar", "日历", "活动", "日期", "日程"],
-        run: () => scrollToId("calendar"),
-      },
-      {
-        id: "nav-projects",
-        group: "nav",
-        label: "监控项目",
-        description: "PROJECTS",
-        keywords: ["projects", "项目", "票档"],
-        run: () => scrollToId("projects"),
+        label: "主展会票档",
+        description: "TICKETS",
+        keywords: ["tickets", "票档", "票务"],
+        run: () => scrollToId("pane-tickets"),
       },
       {
         id: "nav-events",
@@ -85,15 +80,7 @@ export function CommandPalette({
         label: "事件动态",
         description: "EVENTS · Diff 流",
         keywords: ["events", "diffs", "事件", "动态"],
-        run: () => scrollToId("events"),
-      },
-      {
-        id: "nav-trends",
-        group: "nav",
-        label: "库存趋势",
-        description: "TRENDS",
-        keywords: ["trends", "chart", "趋势", "库存"],
-        run: () => scrollToId("trends"),
+        run: () => scrollToId("pane-events"),
       },
       {
         id: "nav-nodes",
@@ -101,7 +88,31 @@ export function CommandPalette({
         label: "采集节点",
         description: "NODES",
         keywords: ["nodes", "节点", "probe"],
-        run: () => scrollToId("nodes"),
+        run: () => scrollToId("pane-nodes"),
+      },
+      {
+        id: "nav-projects",
+        group: "nav",
+        label: "监控项目",
+        description: "PROJECTS",
+        keywords: ["projects", "项目"],
+        run: () => scrollToId("pane-projects"),
+      },
+      {
+        id: "nav-articles",
+        group: "nav",
+        label: "推荐文章",
+        description: "ARTICLES",
+        keywords: ["articles", "文章", "资讯"],
+        run: () => scrollToId("pane-articles"),
+      },
+      {
+        id: "nav-calendar",
+        group: "nav",
+        label: "活动日历",
+        description: "CALENDAR · 举办日期",
+        keywords: ["calendar", "日历", "活动", "日期", "日程"],
+        run: () => scrollToId("pane-calendar"),
       },
     ];
 
@@ -117,7 +128,7 @@ export function CommandPalette({
       {
         id: "action-theme",
         group: "action",
-        label: theme === "dark" ? "切换到日间模式" : "切换到夜间模式",
+        label: resolvedTheme === "dark" ? "切换到日间模式" : "切换到夜间模式",
         description: "主题外观",
         keywords: ["theme", "dark", "light", "主题", "日间", "夜间", "模式"],
         run: () => toggleTheme(),
@@ -125,10 +136,10 @@ export function CommandPalette({
       {
         id: "action-top",
         group: "action",
-        label: "回到顶部",
-        description: "平滑滚动到页面顶端",
+        label: "回到首页栏",
+        description: "滚动到 HERO pane",
         keywords: ["top", "scroll", "顶部", "回到顶部"],
-        run: () => window.scrollTo({ top: 0, behavior: "smooth" }),
+        run: () => scrollToId("pane-hero"),
       },
       {
         id: "action-copy-status",
@@ -150,10 +161,10 @@ export function CommandPalette({
       {
         id: "action-resume",
         group: "action",
-        label: "滚动到项目并查看焦点",
-        description: "PROJECTS 区域",
+        label: "滚动到监控项目",
+        description: "PROJECTS 栏",
         keywords: ["focus", "carousel", "轮播", "焦点"],
-        run: () => scrollToId("projects"),
+        run: () => scrollToId("pane-projects"),
       },
     ];
 
@@ -163,10 +174,10 @@ export function CommandPalette({
       label: p.name || p.id,
       description: [p.venue_name, p.project_label, p.id].filter(Boolean).join(" · "),
       keywords: [p.name || "", p.venue_name || "", p.id, p.project_label || "", "项目"],
-      run: () => {
-        onSelectProject?.(p.id);
-        scrollToId(`project-${p.id}`);
-      },
+        run: () => {
+          onSelectProject?.(p.id);
+          scrollToId("pane-hero");
+        },
     }));
 
     return [...nav, ...actions, ...projectItems];
@@ -174,7 +185,7 @@ export function CommandPalette({
     connectionStatus,
     lastUpdate,
     systemHealthy,
-    theme,
+    resolvedTheme,
     toggleTheme,
     projects,
     onSelectProject,
@@ -253,17 +264,8 @@ export function CommandPalette({
   const mod = modKeyLabel();
 
   return (
-    <Modal.Backdrop
-      isOpen={open}
-      onOpenChange={onOpenChange}
-      variant="blur"
-      className="z-[10000]"
-    >
-      <Modal.Container className="items-center justify-center" placement="center">
-        <Modal.Dialog
-          aria-label="命令面板"
-          className="theme-panel mx-auto mb-[env(safe-area-inset-bottom,0px)] w-[min(100vw-1rem,32rem)] overflow-hidden rounded-sm border p-0 shadow-2xl"
-        >
+    <Modal open={open} onOpenChange={onOpenChange} label="命令面板">
+      <div className="theme-panel-strong w-full overflow-hidden shadow-2xl sm:w-[min(100vw-1rem,32rem)]">
           <div className="border-b border-[var(--hairline)] px-3 py-2.5">
             <div className="flex items-center gap-2">
               <span className="theme-ink-faint text-[10px] tracking-[0.2em]">CMD</span>
@@ -278,7 +280,7 @@ export function CommandPalette({
                 autoComplete="off"
                 spellCheck={false}
               />
-              <kbd className="theme-ink-faint hidden rounded border border-[var(--hairline)] px-1.5 py-0.5 font-mono text-[10px] sm:inline">
+              <kbd className="theme-ink-faint hidden border border-[var(--hairline)] px-1.5 py-0.5 font-mono text-[10px] sm:inline">
                 ESC
               </kbd>
             </div>
@@ -286,7 +288,7 @@ export function CommandPalette({
 
           <div
             ref={listRef}
-            className="max-h-[min(60dvh,22rem)] overflow-y-auto overscroll-contain py-1"
+            className="thin-scroll max-h-[min(60dvh,22rem)] overflow-y-auto overscroll-contain py-1"
             role="listbox"
             aria-label="命令列表"
           >
@@ -347,12 +349,11 @@ export function CommandPalette({
 
           <div className="theme-hairline flex items-center justify-between border-t px-3 py-2">
             <p className="theme-ink-faint text-[10px] tracking-wider">
-              ↑↓ 选择 · Enter 执行 · {mod}K 开关
+              ↑↓ 选择 · Enter 执行 · {mod}K 文档搜索
             </p>
             <p className="theme-ink-faint font-mono text-[10px]">{filtered.length}</p>
           </div>
-        </Modal.Dialog>
-      </Modal.Container>
-    </Modal.Backdrop>
+      </div>
+    </Modal>
   );
 }

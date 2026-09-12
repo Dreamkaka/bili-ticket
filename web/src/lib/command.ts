@@ -28,7 +28,13 @@ export function modKeyLabel(): string {
 export function scrollToId(id: string) {
   const el = document.getElementById(id);
   if (!el) return;
-  el.scrollIntoView({ behavior: "smooth", block: "start" });
+  const rail = document.getElementById("home-rail");
+  if (rail) {
+    const left = el.offsetLeft - rail.offsetLeft;
+    rail.scrollTo({ left, behavior: "smooth" });
+    return;
+  }
+  el.scrollIntoView({ behavior: "smooth", block: "nearest" });
 }
 
 export function matchesQuery(item: CommandItem, query: string): boolean {

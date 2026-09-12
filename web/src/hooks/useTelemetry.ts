@@ -429,8 +429,9 @@ export function useTelemetry() {
 
   const onlineNodes = useMemo(() => {
     const now = Date.now();
-    return nodes.filter((n) => isNodeAlive(n.last_heartbeat, now, n.role))
-      .length;
+    return nodes.filter((n) =>
+      isNodeAlive(n.last_heartbeat, now, n.role, n.transport)
+    ).length;
   }, [nodes, lastUpdate]);
 
   // 全局健康只看主探针；monitor 离线/风控不拉垮系统指示
@@ -441,7 +442,8 @@ export function useTelemetry() {
     const now = Date.now();
     return primaries.every(
       (n) =>
-        n.status === "healthy" || isNodeAlive(n.last_heartbeat, now, n.role),
+        n.status === "healthy" ||
+        isNodeAlive(n.last_heartbeat, now, n.role, n.transport),
     );
   }, [connectionStatus, nodes, lastUpdate]);
 

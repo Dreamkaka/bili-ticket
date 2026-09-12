@@ -87,7 +87,7 @@ export function BootSequence({
 
               <div className="absolute right-3 bottom-6 max-w-[11rem] text-right sm:right-8 sm:bottom-10 sm:max-w-[14rem]">
                 <div className="mb-2 flex items-center justify-end gap-2">
-                  <span className="h-1.5 w-1.5 rounded-full bg-accent shadow-[0_0_8px_color-mix(in_oklab,var(--accent)_70%,transparent)]" />
+                  <span className="h-1.5 w-1.5 bg-accent shadow-[0_0_8px_color-mix(in_oklab,var(--accent)_70%,transparent)]" />
                   <p className="text-[8px] tracking-[0.16em] text-[var(--ink-faint)] uppercase sm:text-[9px] sm:tracking-[0.2em]">
                     Mission Dependent Payload
                   </p>

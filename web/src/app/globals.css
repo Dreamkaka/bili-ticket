@@ -1,7 +1,8 @@
 @import "tailwindcss";
-@import "@heroui/styles";
+@import "fumadocs-ui/css/neutral.css";
+@import "fumadocs-ui/css/preset.css";
 
-/* 默认 / 亮色 */
+/* ---------- v2 机能风 tokens（直角，搜索框微圆角） ---------- */
 :root,
 .light,
 [data-theme="light"] {
@@ -26,14 +27,12 @@
   --danger: oklch(0.58 0.18 25);
   --danger-foreground: oklch(0.99 0.01 25);
   --border: oklch(0.84 0.02 250);
-  --radius: 0.25rem;
-  --field-radius: 0.25rem;
   --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
 
   --panel: oklch(1 0.005 250 / 0.88);
   --panel-strong: oklch(1 0.005 250 / 0.95);
-  --nav-bg: oklch(0.98 0.008 250 / 0.9);
+  --nav-bg: oklch(0.98 0.008 250 / 0.86);
   --scrim: oklch(0.97 0.01 250 / 0.72);
   --scrim-strong: oklch(0.96 0.01 250 / 0.82);
   --scrim-base: oklch(0.98 0.008 250 / 0.68);
@@ -44,6 +43,24 @@
   --chart-grid: oklch(0.2 0.02 250 / 0.08);
   --chart-tick: oklch(0.45 0.02 250);
   --dot: oklch(0.2 0.02 250 / 0.08);
+
+  /* Fumadocs 亮色变量桥接 */
+  --fd-background: var(--background);
+  --fd-foreground: var(--foreground);
+  --fd-muted: var(--surface-secondary);
+  --fd-muted-foreground: var(--ink-soft);
+  --fd-popover: var(--overlay);
+  --fd-popover-foreground: var(--overlay-foreground);
+  --fd-card: var(--surface);
+  --fd-card-foreground: var(--surface-foreground);
+  --fd-border: var(--border);
+  --fd-primary: var(--accent);
+  --fd-primary-foreground: var(--accent-foreground);
+  --fd-secondary: var(--surface-secondary);
+  --fd-secondary-foreground: var(--foreground);
+  --fd-accent: var(--surface-secondary);
+  --fd-accent-foreground: var(--accent);
+  --fd-ring: var(--accent);
 }
 
 .dark,
@@ -72,7 +89,7 @@
 
   --panel: oklch(0.08 0.015 250 / 0.72);
   --panel-strong: oklch(0.08 0.015 250 / 0.85);
-  --nav-bg: oklch(0.06 0.01 250 / 0.82);
+  --nav-bg: oklch(0.06 0.01 250 / 0.8);
   --scrim: oklch(0.05 0.01 250 / 0.72);
   --scrim-strong: oklch(0.04 0.01 250 / 0.82);
   --scrim-base: oklch(0.04 0.01 250 / 0.68);
@@ -83,6 +100,24 @@
   --chart-grid: oklch(1 0 0 / 0.06);
   --chart-tick: oklch(0.55 0.01 250);
   --dot: oklch(1 0 0 / 0.05);
+
+  /* Fumadocs 暗色变量桥接 */
+  --fd-background: var(--background);
+  --fd-foreground: var(--foreground);
+  --fd-muted: var(--surface-secondary);
+  --fd-muted-foreground: var(--ink-soft);
+  --fd-popover: var(--overlay);
+  --fd-popover-foreground: var(--overlay-foreground);
+  --fd-card: var(--surface);
+  --fd-card-foreground: var(--surface-foreground);
+  --fd-border: var(--border);
+  --fd-primary: var(--accent);
+  --fd-primary-foreground: var(--accent-foreground);
+  --fd-secondary: var(--surface-secondary);
+  --fd-secondary-foreground: var(--foreground);
+  --fd-accent: var(--surface-secondary);
+  --fd-accent-foreground: var(--accent);
+  --fd-ring: var(--accent);
 }
 
 @theme inline {
@@ -90,6 +125,12 @@
   --color-foreground: var(--foreground);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-danger: var(--danger);
+  --color-danger-foreground: var(--danger-foreground);
   --color-muted: var(--muted);
   --color-border: var(--border);
   --color-surface: var(--surface);
@@ -102,9 +143,15 @@
   --font-mono: var(--font-geist-mono);
 }
 
+@theme {
+  --radius-card: 0;
+  --radius-panel: 0;
+  --radius-control: 0;
+  --radius-search: 4px;
+}
+
 html {
   scroll-behavior: smooth;
-  overflow-x: hidden;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -140,6 +187,10 @@ body {
     color 0.35s var(--ease-out-soft);
 }
 
+::selection {
+  background: color-mix(in oklch, var(--accent) 30%, transparent);
+}
+
 /* 横向导航滚动条隐藏 */
 .nav-scroll {
   -webkit-overflow-scrolling: touch;
@@ -147,6 +198,24 @@ body {
 }
 .nav-scroll::-webkit-scrollbar {
   display: none;
+}
+
+/* 细滚动条（面板内） */
+.thin-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in oklch, var(--ink-faint) 45%, transparent)
+    transparent;
+}
+.thin-scroll::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.thin-scroll::-webkit-scrollbar-thumb {
+  background: color-mix(in oklch, var(--ink-faint) 45%, transparent);
+  border-radius: 0;
+}
+.thin-scroll::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 /* 自定义光标：仅 fine pointer + 非 reduced-motion 时启用 */
@@ -264,6 +333,70 @@ html.custom-cursor * {
   }
 }
 
+@keyframes toastIn {
+  from {
+    opacity: 0;
+    transform: translateX(24px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+@keyframes toastOut {
+  from {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(24px) scale(0.96);
+  }
+}
+
+@keyframes modalBackdropIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes modalDialogIn {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes spinSlow {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes digitFlip {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.digit-flip {
+  display: inline-block;
+  animation: digitFlip 0.28s var(--ease-out-expo) both;
+}
+
 .animate-fade-in {
   animation: fadeIn 0.5s var(--ease-out-expo) both;
 }
@@ -358,7 +491,31 @@ html.custom-cursor * {
 }
 
 .section-block {
-  scroll-margin-top: 5rem;
+  scroll-margin-top: 6.5rem;
+}
+
+/* ---------- v2 面板 / 控件 ---------- */
+
+.ak-panel {
+  background: var(--panel);
+  border: 1px solid var(--hairline);
+  border-radius: 0;
+  backdrop-filter: blur(10px);
+  transition:
+    border-color 0.35s var(--ease-out-soft),
+    background-color 0.35s var(--ease-out-soft),
+    box-shadow 0.35s var(--ease-out-soft),
+    transform 0.35s var(--ease-out-soft);
+}
+
+.ak-panel:hover {
+  border-color: color-mix(in oklch, var(--accent) 35%, transparent);
+}
+
+.ak-panel-strong {
+  background: var(--panel-strong);
+  border: 1px solid var(--hairline);
+  border-radius: 0;
 }
 
 .reveal-section {
@@ -453,4 +610,111 @@ html.custom-cursor * {
 
 .theme-scrim-strong {
   background: var(--scrim-strong);
+}
+
+/* ---------- fumadocs 组件微调（直角 + 搜索微圆角） ---------- */
+
+.fd-root {
+  --fd-layout-width: 100%;
+}
+
+.home-rail {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in oklch, var(--ink-faint) 45%, transparent)
+    transparent;
+  -webkit-overflow-scrolling: touch;
+}
+.home-rail::-webkit-scrollbar {
+  height: 8px;
+}
+.home-rail::-webkit-scrollbar-thumb {
+  background: color-mix(in oklch, var(--ink-faint) 45%, transparent);
+  border-radius: 0;
+}
+
+@media (max-width: 767px) {
+  .home-rail {
+    scrollbar-width: none;
+  }
+  .home-rail::-webkit-scrollbar {
+    display: none;
+  }
+
+}
+
+[data-fd-doc-style] {
+  --fd-card-radius: 0;
+}
+
+#nd-nav {
+  border-radius: 0;
+  background: var(--background);
+  border-bottom: 1px solid var(--hairline);
+}
+
+#nd-nav > div {
+  background: var(--background);
+  backdrop-filter: none;
+}
+
+#nd-nav [data-slot="navigation-menu-viewport"],
+#nd-nav [data-slot="navigation-menu-content"],
+#nd-nav div[class*="absolute"],
+#nd-nav [data-state="open"] {
+  background: var(--background);
+}
+
+#nd-nav [data-radix-navigation-menu-content] {
+  background: var(--background);
+}
+
+#nd-nav [data-radix-navigation-menu-viewport] {
+  background: var(--background);
+  border-bottom: 1px solid var(--hairline);
+}
+
+#nd-nav nav a {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+#nd-nav nav a[data-active="true"] {
+  color: var(--accent);
+}
+
+#nd-nav nav a:hover {
+  color: var(--ink);
+}
+
+#nd-nav [data-search-full],
+#nd-nav [data-search] {
+  border-radius: var(--radius-search);
+}
+
+#nd-nav [data-search-full] kbd,
+#nd-nav kbd {
+  border-radius: var(--radius-search);
+}
+
+[role="dialog"] [data-search-full],
+[data-search-full] {
+  border-radius: var(--radius-search);
+}
+
+.dark .shiki:not(.not-fumadocs-codeblock *) code span,
+[data-theme="dark"] .shiki:not(.not-fumadocs-codeblock *) code span {
+  color: var(--shiki-dark);
+  font-style: var(--shiki-dark-font-style);
+}
+
+.shiki {
+  overflow-x: auto;
+}
+
+figure.shiki,
+.shiki {
+  border-radius: 0;
 }
