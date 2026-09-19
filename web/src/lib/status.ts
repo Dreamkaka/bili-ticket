@@ -2,6 +2,16 @@ export function isAvailableStatus(status: string): boolean {
   return status === "可售" || status.includes("有票") || status.includes("预售中");
 }
 
+export function isUnsoldStatus(status: string): boolean {
+  return status.includes("未开售") || status.includes("待开售");
+}
+
+/** B 站 saleStart 多为秒级时间戳 */
+export function saleStartMs(saleStart?: number | null): number | null {
+  if (!saleStart || saleStart <= 0) return null;
+  return saleStart < 1e12 ? saleStart * 1000 : saleStart;
+}
+
 export function isSoldOutStatus(status: string): boolean {
   return (
     status === "已售罄" ||

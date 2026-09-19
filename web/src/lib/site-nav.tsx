@@ -9,6 +9,7 @@ export const SITE_TITLE = (
 
 export const SITE_LINKS: LinkItemType[] = [
   { text: "首页", url: "/" },
+  { text: "地图", url: "/map" },
   { text: "攻略", url: "/guides" },
   { text: "文章", url: "/articles" },
 ];

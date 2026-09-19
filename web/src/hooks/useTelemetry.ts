@@ -365,6 +365,7 @@ export function useTelemetry() {
                   ...t,
                   status: match.new_status,
                   less_vt: match.less_vt,
+                  sale_start: match.sale_start ?? t.sale_start,
                   last_updated: match.ts * 1000,
                 };
               });

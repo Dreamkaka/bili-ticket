@@ -36,6 +36,7 @@ export interface Ticket {
   status: string;
   price: number;
   less_vt: number;
+  sale_start?: number;
   last_updated: number;
 }
 
@@ -47,6 +48,7 @@ export interface Diff {
   new_status: string;
   ts: number;
   less_vt: number;
+  sale_start?: number;
   project_id?: string;
   project_name?: string;
   project_cover?: string | null;

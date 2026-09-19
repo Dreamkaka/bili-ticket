@@ -70,6 +70,7 @@ export function ticketEqual(
     less_vt: number;
     price: number;
     name: string;
+    sale_start?: number;
     last_updated: number;
   },
   b: typeof a
@@ -81,6 +82,7 @@ export function ticketEqual(
     a.less_vt === b.less_vt &&
     a.price === b.price &&
     a.name === b.name &&
+    (a.sale_start ?? 0) === (b.sale_start ?? 0) &&
     a.last_updated === b.last_updated
   );
 }

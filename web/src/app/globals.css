@@ -710,6 +710,19 @@ html.custom-cursor * {
   font-style: var(--shiki-dark-font-style);
 }
 
+.amap-container,
+.amap-container .amap-maps,
+.amap-container .amap-layers {
+  width: 100%;
+  height: 100%;
+}
+
+.amap-indoor-floorbar,
+.amap-indoormap-floorbar-container,
+.amap-indoor .amap-indoor-floor {
+  display: none !important;
+}
+
 .shiki {
   overflow-x: auto;
 }

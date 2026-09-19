@@ -4,7 +4,13 @@ import { memo, useEffect, useState } from "react";
 import Link from "next/link";
 import type { FeaturedInfo } from "@/lib/featured";
 import type { Ticket } from "@/lib/types";
-import { formatClock, isAvailableStatus } from "@/lib/status";
+import {
+  formatClock,
+  isAvailableStatus,
+  isSoldOutStatus,
+  isUnsoldStatus,
+  saleStartMs,
+} from "@/lib/status";
 import { useCountdown } from "@/hooks/useCountdown";
 import { Badge } from "@/components/ui/Badge";
 import { Spinner } from "@/components/ui/Spinner";
@@ -79,6 +85,21 @@ export const ExhibitionHero = memo(function ExhibitionHero({
   const targetMs =
     phase === "ongoing" ? featured?.endingMs : featured?.openingMs;
   const countdown = useCountdown(phase === "ended" ? null : (targetMs ?? null));
+  const saleStartTarget = (() => {
+    const saleStarted = tickets.some(
+      (t) => isAvailableStatus(t.status) || isSoldOutStatus(t.status)
+    );
+    if (saleStarted) return null;
+    const unsold = tickets.filter((t) => isUnsoldStatus(t.status));
+    if (unsold.length === 0) return null;
+    const times = unsold
+      .map((t) => saleStartMs(t.sale_start))
+      .filter((n): n is number => n != null && n > Date.now());
+    if (times.length === 0) return null;
+    return Math.min(...times);
+  })();
+  const saleCountdown = useCountdown(saleStartTarget);
+  const showSaleCountdown = saleStartTarget != null && !saleCountdown.over;
   const available = tickets.filter((t) => isAvailableStatus(t.status)).length;
   const ratio = tickets.length > 0 ? available / tickets.length : 0;
   const [covers, setCovers] = useState<CoverLayer[]>(() => [
@@ -189,6 +210,22 @@ export const ExhibitionHero = memo(function ExhibitionHero({
       </div>
 
       <div className="border-t border-[var(--hairline)] px-4 py-3 sm:px-5 sm:py-4 md:px-6">
+        {showSaleCountdown && (
+          <div className="mb-4">
+            <div className="mb-3 flex items-center gap-3">
+              <span className="font-mono text-[10px] tracking-[0.1em] text-accent uppercase">
+                距开售
+              </span>
+              <span className="h-px flex-1 bg-[var(--hairline)]" />
+            </div>
+            <div className="animate-fade-in-up flex items-stretch gap-1.5">
+              <CountdownCell value={String(saleCountdown.days)} label="天 DAYS" />
+              <CountdownCell value={pad(saleCountdown.hours)} label="时 HRS" />
+              <CountdownCell value={pad(saleCountdown.minutes)} label="分 MIN" />
+              <CountdownCell value={pad(saleCountdown.seconds)} label="秒 SEC" />
+            </div>
+          </div>
+        )}
         <div className="mb-3 flex items-center gap-3">
           <span className="font-mono text-[10px] tracking-[0.1em] text-[var(--ink-faint)] uppercase">
             {phase === "ongoing" ? "距闭幕" : "距开幕"}

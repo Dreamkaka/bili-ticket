@@ -5,6 +5,7 @@ import type { ConnectionStatus, Project } from "@/lib/types";
 import { formatClock } from "@/lib/status";
 import { Modal } from "@/components/ui/Modal";
 import { useTheme } from "next-themes";
+import { useRouter } from "next/navigation";
 import {
   GROUP_LABEL,
   matchesQuery,
@@ -36,6 +37,7 @@ export function CommandPalette({
   onSelectProject?: (id: string) => void;
   onOpenNotifications?: () => void;
 }) {
+  const router = useRouter();
   const { resolvedTheme, setTheme } = useTheme();
   const toggleTheme = useCallback(() => {
     setTheme(resolvedTheme === "dark" ? "light" : "dark");
@@ -114,6 +116,16 @@ export function CommandPalette({
         keywords: ["calendar", "日历", "活动", "日期", "日程"],
         run: () => scrollToId("pane-calendar"),
       },
+      {
+        id: "nav-map",
+        group: "nav",
+        label: "展会地图",
+        description: "MAP · 场馆与天气",
+        keywords: ["map", "地图", "场馆", "天气", "高德", "预报"],
+        run: () => {
+          router.push("/map");
+        },
+      },
     ];
 
     const actions: CommandItem[] = [
@@ -190,6 +202,7 @@ export function CommandPalette({
     projects,
     onSelectProject,
     onOpenNotifications,
+    router,
   ]);
 
   const filtered = useMemo(() => {

@@ -94,6 +94,12 @@ export function SiteFooter({
       })}
       <span className="mx-1 hidden h-3 w-px shrink-0 bg-[var(--hairline)] sm:block" />
       <a
+        href="/map"
+        className="shrink-0 px-2 py-1 font-mono text-[10px] tracking-[0.08em] text-[var(--ink-faint)] uppercase transition-colors hover:text-[var(--ink)]"
+      >
+        MAP
+      </a>
+      <a
         href="/guides"
         className="shrink-0 px-2 py-1 font-mono text-[10px] tracking-[0.08em] text-[var(--ink-faint)] uppercase transition-colors hover:text-[var(--ink)]"
       >

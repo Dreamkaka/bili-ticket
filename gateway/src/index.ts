@@ -112,6 +112,7 @@ db.exec(`
     status TEXT NOT NULL,
     price INTEGER,
     less_vt INTEGER DEFAULT -1,
+    sale_start INTEGER DEFAULT 0,
     last_updated INTEGER
   );
 `);
@@ -153,6 +154,18 @@ try {
   console.error("Database nodes.role migration failed:", e);
 }
 
+try {
+  const ticketInfo = db.prepare("PRAGMA table_info(tickets)").all() as {
+    name: string;
+  }[];
+  const ticketColumns = ticketInfo.map((c) => c.name);
+  if (!ticketColumns.includes("sale_start")) {
+    db.exec("ALTER TABLE tickets ADD COLUMN sale_start INTEGER DEFAULT 0;");
+  }
+} catch (e) {
+  console.error("Database tickets.sale_start migration failed:", e);
+}
+
 const configPath =
   process.env.CONFIG_PATH || path.join(process.cwd(), "config.json");
 let initialPollInterval = 5000;
@@ -185,6 +198,7 @@ async function fetchProjectMetadata(projectId: string) {
         name: string;
         status: string;
         price: number;
+        sale_start: number;
       }[] = [];
       if (Array.isArray(json.data.screen_list)) {
         for (const screen of json.data.screen_list) {
@@ -202,6 +216,7 @@ async function fetchProjectMetadata(projectId: string) {
                 name: `${screenName} / ${desc}`,
                 status: status,
                 price: price,
+                sale_start: Number(t.saleStart ?? t.sale_start ?? 0),
               });
             }
           }
@@ -272,11 +287,12 @@ async function syncProjectsFromConfig() {
     `);
 
     const upsertTicketFromMeta = db.prepare(`
-      INSERT INTO tickets (project_id, sub_ticket_id, key, name, status, price, less_vt, last_updated)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO tickets (project_id, sub_ticket_id, key, name, status, price, less_vt, sale_start, last_updated)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(key) DO UPDATE SET
         status = excluded.status,
         price = excluded.price,
+        sale_start = excluded.sale_start,
         last_updated = excluded.last_updated
     `);
 
@@ -309,6 +325,7 @@ async function syncProjectsFromConfig() {
               tk.status,
               tk.price,
               -1,
+              Number(tk.sale_start ?? 0),
               now,
             );
           }
@@ -418,6 +435,7 @@ type DiffEventLike = {
   new_status?: unknown;
   ts?: unknown;
   less_vt?: unknown;
+  sale_start?: unknown;
   sub_ticket_id?: unknown;
   key?: unknown;
   price?: unknown;
@@ -435,11 +453,15 @@ function ingestDiffs(nodeName: string, data: DiffEventLike[]) {
   `);
 
   const upsertTicketFromDiff = db.prepare(`
-    INSERT INTO tickets (project_id, sub_ticket_id, key, name, status, price, less_vt, last_updated)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO tickets (project_id, sub_ticket_id, key, name, status, price, less_vt, sale_start, last_updated)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(key) DO UPDATE SET
       status = excluded.status,
       less_vt = excluded.less_vt,
+      sale_start = CASE
+        WHEN excluded.sale_start > 0 THEN excluded.sale_start
+        ELSE tickets.sale_start
+      END,
       last_updated = excluded.last_updated
   `);
 
@@ -462,6 +484,7 @@ function ingestDiffs(nodeName: string, data: DiffEventLike[]) {
         String(diff.new_status),
         Number(diff.price || 0),
         Number(diff.less_vt ?? -1),
+        Number(diff.sale_start ?? 0),
         Number(diff.ts),
       );
     }
@@ -787,7 +810,7 @@ const app = new Elysia({ adapter: node() })
         const nodes = listNodesForFrontend();
         const tickets = db
           .prepare(
-            "SELECT project_id, sub_ticket_id, key, name, status, price, less_vt, last_updated FROM tickets WHERE status != 'removed'",
+            "SELECT project_id, sub_ticket_id, key, name, status, price, less_vt, sale_start, last_updated FROM tickets WHERE status != 'removed'",
           )
           .all();
         const recentDiffs = db
@@ -919,7 +942,7 @@ const app = new Elysia({ adapter: node() })
         const nodes = listNodesForFrontend();
         const tickets = db
           .prepare(
-            "SELECT project_id, sub_ticket_id, key, name, status, price, less_vt, last_updated FROM tickets WHERE status != 'removed'",
+            "SELECT project_id, sub_ticket_id, key, name, status, price, less_vt, sale_start, last_updated FROM tickets WHERE status != 'removed'",
           )
           .all();
         const recentDiffs = db
@@ -1027,7 +1050,7 @@ setInterval(() => {
     const nodes = listNodesForFrontend();
     const tickets = db
       .prepare(
-        "SELECT project_id, sub_ticket_id, key, name, status, price, less_vt, last_updated FROM tickets WHERE status != 'removed'",
+        "SELECT project_id, sub_ticket_id, key, name, status, price, less_vt, sale_start, last_updated FROM tickets WHERE status != 'removed'",
       )
       .all();
 
